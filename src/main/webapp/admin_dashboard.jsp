@@ -1,5 +1,5 @@
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
-<%@page import="com.event.model.User"%>
+<%@page import="com.event.model.User, com.event.model.Event, java.util.List, java.util.ArrayList"%>
 <%
     // Security Check
     User user = (User) session.getAttribute("user");
@@ -7,7 +7,21 @@
         response.sendRedirect("login.jsp");
         return;
     }
+    // Initialize DAOs
+    com.event.dao.EventDAO dao = new com.event.dao.EventDAO();
+    com.event.dao.UserDAO userDao = new com.event.dao.UserDAO();
+
+    // Fetch Stats
+    int totalEvents = dao.getCount("EVENT");
+    int totalStudents = userDao.getStudentCount(); 
+    int totalRegs = dao.getCount("REGISTRATION");
+
+    List<Event> events = dao.getAllEvents();
+    if (events == null) events = new ArrayList<>();
+
+    request.setAttribute("activePage", "dashboard");
 %>
+<% request.setAttribute("activePage", "dashboard"); %>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -17,7 +31,10 @@
     <meta name="description" content="">
     <meta name="author" content="Tooplate">
     <link href="https://fonts.googleapis.com/css?family=Poppins:100,100i,200,200i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i&display=swap" rel="stylesheet">
-
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
     <title>Dashboard</title>
 
 
@@ -29,13 +46,7 @@
     <link rel="stylesheet" type="text/css" href="assets/css/owl-carousel.css">
 
     <link rel="stylesheet" href="assets/css/tooplate-artxibition.css">
-<!--
 
-Tooplate 2125 ArtXibition
-
-https://www.tooplate.com/view/2125-artxibition
-
--->
     <style>
     body {
         background-color: #f2f2fe; 
@@ -54,13 +65,23 @@ https://www.tooplate.com/view/2125-artxibition
     }
 
     .stat-card {
-        padding: 25px;
-        width: 32%;
-        border-radius: 15px;
-        text-align: center;
-        box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
-        background-color: #fefcfb; /* soft off-white */
-    }
+            background: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            width: 30%;
+            transition: transform 0.3s;
+            border-bottom: 4px solid #fb3f3f; /* Digitific Red Accent */
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card li { font-size: 16px; color: #666; font-weight: 500; }
+        .stat-card span { 
+            display: block; 
+            font-size: 32px; 
+            color: #2a2a2a; 
+            font-weight: 700; 
+            margin-top: 10px; 
+        }
 
     .stat-card h4 {
         font-size: 18px;
@@ -111,39 +132,61 @@ https://www.tooplate.com/view/2125-artxibition
     tr:nth-child(odd) {
         background-color: #f9f7fc; 
     }
+    
+    
+    .fc-event {
+        cursor: pointer;
+        background-color: #fb3f3f !important; /* Your Digitific Red */
+        border: none !important;
+    }
+    #calendar {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .admin-calendar-wrapper {
+            background: white; padding: 30px; border-radius: 15px; 
+            box-shadow: 0px 10px 30px rgba(0,0,0,0.1); margin-bottom: 50px;
+        }
+        .fc-event { cursor: pointer; border: none !important; padding: 2px 5px; }
+        .fc-button-primary { background-color: #2a2a2a !important; border: none !important; }
+        .fc-button-primary:hover { background-color: #fb3f3f !important; }
+
+        /* Table Styling */
+        .report-table {
+            width: 100%; background: white; border-radius: 15px; overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-top: 20px;
+        }
+        .report-table th { background: #2a2a2a; color: white; padding: 15px; }
+        .report-table td { padding: 15px; border-bottom: 1px solid #eee; }
+        
+    .tooltip-inner {
+        background-color: #2a2a2a !important;
+        color: #fff;
+        padding: 10px 15px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        text-align: left;
+    }
 </style>
 
 
 </head>
 <body>
-    <!-- ***** Header Area Start ***** -->
-    <header class="header-area header-sticky">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <nav class="main-nav">
-                        <!-- ***** Logo Start ***** -->
-                        <a href="index.html" class="logo"><em>Digitific</em></a>
-                        <!-- ***** Logo End ***** -->
-                        <!-- ***** Menu Start <li><a href="tickets.html">Tickets</a></li> ***** -->
-                        <ul class="nav">
-                            <li><a href="index.jsp">Home</a></li>
-                            <li><a href="admin_dashboard.jsp" class="active">Dashboard</a></li> 
-                            <li><a href="ad_event.jsp">Shows & Events</a></li> 
-                            <li><a href="users.jsp">Users</a></li> 
-                            <li><a href="LogoutServlet">Logout</a></li>  
-                        </ul>        
-                        <a class='menu-trigger'>
-                            <span>Menu</span>
-                        </a>
-                        <!-- ***** Menu End ***** -->
-                    </nav>
-                </div>
+     <!-- ***** Preloader Start ***** -->
+        <div id="js-preloader" class="js-preloader">
+          <div class="preloader-inner">
+            <span class="dot"></span>
+            <div class="dots">
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
+          </div>
         </div>
-    </header>
-
-    <!-- ***** Header Area End ***** -->
+        <!-- ***** Preloader End ***** -->
+        <%@ include file="header.jsp" %>
+    
     <div class="dashboard-container">
         
         <div class="container-fluid">
@@ -154,22 +197,28 @@ https://www.tooplate.com/view/2125-artxibition
                     </div>
             </div>
         </div>
-        <%
-            com.event.dao.EventDAO dao = new com.event.dao.EventDAO();
-            com.event.dao.UserDAO userDao = new com.event.dao.UserDAO();
-            int totalEvents = dao.getCount("EVENT");
-            int totalStudents = userDao.getStudentCount(); 
-            int totalRegs = dao.getCount("REGISTRATION");
-        %>
         <div class="counter-content dashboard-counter">
         <ul>
             <div class="stat-card"><li>Total Events<span id="stat-upcoming"><%= totalEvents %></span></li></div>
             <div class="stat-card"><li>Total Students<span id="stat-week"><%= totalStudents %></span></li></div>
-            <div class="stat-card"><li>Registrations<span id="stat-joined"><%= totalRegs %></span></li></div>
+            <div class="stat-card"><li>Event Registrations<span id="stat-joined"><%= totalRegs %></span></li></div>
         </ul>
 
         </div>
-
+        <!-- calendar -->
+        <div class="container mt-5">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="section-heading">
+                        <h2>Event Schedule Overview</h2>
+                        <span>Global view of all system events</span>
+                    </div>
+                    <div class="admin-calendar-wrapper">
+                        <div id='calendar'></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- TABLE -->
         <div class="section-heading">
             <h2>Registrations Per Event</h2>
@@ -194,8 +243,8 @@ https://www.tooplate.com/view/2125-artxibition
                     for(String[] row : report) {
             %>
                 <tr>
-                    <td><%= row[0] %></td>
-                    <td><%= row[1] %></td>
+                    <td><strong><%= row[0] %></strong></td>
+                    <td><span class="badge badge-danger" style="background:#fb3f3f;"><%= row[1] %> Joined</span></td>
                 </tr>
             <% 
                     } 
@@ -204,6 +253,76 @@ https://www.tooplate.com/view/2125-artxibition
         </table>
 
     </div>
+      <!-- jQuery -->
+        <script src="assets/js/jquery-2.1.0.min.js"></script>
 
+        <!-- Bootstrap -->
+        <script src="assets/js/popper.js"></script>
+        <script src="assets/js/bootstrap.min.js"></script>
+
+        <!-- Plugins -->
+        <script src="assets/js/scrollreveal.min.js"></script>
+        <script src="assets/js/waypoints.min.js"></script>
+        <script src="assets/js/jquery.counterup.min.js"></script>
+        <script src="assets/js/imgfix.min.js"></script> 
+        <script src="assets/js/mixitup.js"></script> 
+        <script src="assets/js/accordions.js"></script>
+        <script src="assets/js/owl-carousel.js"></script>
+
+        <!-- Global Init -->
+        <script src="assets/js/custom.js"></script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek'
+                },
+                events: [
+                    <%-- Loop through ALL events fetched by EventDAO --%>
+                    <% for(Event e : events) { %>
+                    {
+                        id: '<%= e.getEventID() %>',
+                        title: '<%= e.getEventTitle().replace("'", "\\'") %>',
+                        start: '<%= e.getEventDate() %>T<%= e.getStartTime() %>',
+                        end: '<%= e.getEventDate() %>T<%= e.getEndTime() %>',
+                        extendedProps: {
+                            venue: '<%= e.getEventVenue().replace("'", "\\'") %>',
+                            type: '<%= e.getEventType() %>'
+                        },
+                        backgroundColor: '#fb3f3f', // Admin default to Brand Red
+                        borderColor: '#fb3f3f',
+                        url: 'event-details.jsp?id=<%= e.getEventID() %>'
+                    },
+                    <% } %>
+                ],
+
+                // This handles the "Pretty" Tooltip on Hover
+                eventDidMount: function(info) {
+                    $(info.el).tooltip({
+                        title: "<strong>" + info.event.title + "</strong><br>" +
+                               "<small><i class='fa fa-tag'></i> " + info.event.extendedProps.type + "</small><br>" +
+                               "<i class='fa fa-map-marker'></i> " + info.event.extendedProps.venue,
+                        placement: 'top',
+                        trigger: 'hover',
+                        container: 'body',
+                        html: true
+                    });
+                },
+
+                eventClick: function(info) {
+                    if (info.event.url) {
+                        window.location.href = info.event.url;
+                        info.jsEvent.preventDefault();
+                    }
+                }
+            });
+            calendar.render();
+        });
+        </script> 
 </body>
 </html>

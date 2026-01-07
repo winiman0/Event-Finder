@@ -5,6 +5,8 @@ import com.event.util.DBConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDAO {
 
@@ -80,5 +82,33 @@ public class UserDAO {
             if (rs.next()) count = rs.getInt(1);
         } catch (Exception e) { e.printStackTrace(); }
         return count;
+    }
+    
+    public List<User> getAllUsers() {
+        List<User> list = new ArrayList<>();
+        // Use a JOIN to get Name and State from the CAMPUS table
+        String sql = "SELECT u.*, c.CampusName, c.CampusState " +
+                     "FROM USERS u " +
+                     "LEFT JOIN CAMPUS c ON u.CampusID = c.CampusID";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                User u = new User();
+                u.setUserID(rs.getString("UserID"));
+                u.setFullName(rs.getString("FullName"));
+                u.setEmail(rs.getString("Email"));
+                u.setRole(rs.getString("Role"));
+                u.setCampusID(rs.getString("CampusID"));
+                u.setPhoneNumber(rs.getString("Phone")); 
+               
+                u.setCampusName(rs.getString("CampusName"));
+                u.setCampusState(rs.getString("CampusState"));
+                list.add(u);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return list;
     }
 }

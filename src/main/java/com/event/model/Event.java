@@ -16,6 +16,10 @@ public class Event implements Serializable {
     private Time endTime;
     private String status;
     private String imageURL;
+    private int meritPoints;
+    private int maxCapacity;
+    private String campusID;
+    private String campusName;
 
     public Event() {}
 
@@ -52,4 +56,16 @@ public class Event implements Serializable {
 
     public String getImageURL() { return imageURL; }
     public void setImageURL(String imageURL) { this.imageURL = imageURL; }
+    
+    public int getMeritPoints() { return meritPoints; }
+    public void setMeritPoints(int meritPoints) { this.meritPoints = meritPoints; }
+
+    public int getMaxCapacity() { return maxCapacity; }
+    public void setMaxCapacity(int maxCapacity) { this.maxCapacity = maxCapacity; }
+    
+    public String getCampusID() { return campusID; }
+    public void setCampusID(String campusID) { this.campusID = campusID; }
+
+    public String getCampusName() { return campusName; }
+    public void setCampusName(String campusName) { this.campusName = campusName; }
 }

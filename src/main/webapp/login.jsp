@@ -1,4 +1,5 @@
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
+<% request.setAttribute("activePage", "login"); %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,30 +37,26 @@ https://www.tooplate.com/view/2125-artxibition
 </head>
 
 <body>
-    
-  <!-- Header -->
-  <header class="header-area header-sticky">
-    <div class="container">
-      <div class="row">
-        <div class="col-12">
-          <nav class="main-nav">
-            <a href="index.html" class="logo"><em>Digitific</em></a>
-            <ul class="nav">
-              <li><a href="index.html">Home</a></li>
-              <li><a href="shows-events.html">Events</a></li>
-              <li><a href="register.html" class="active">Register</a></li>
-            </ul>
-            <a class='menu-trigger'><span>Menu</span></a>
-          </nav>
+        <!-- ***** Preloader Start ***** -->
+    <div id="js-preloader" class="js-preloader">
+      <div class="preloader-inner">
+        <span class="dot"></span>
+        <div class="dots">
+          <span></span>
+          <span></span>
+          <span></span>
         </div>
       </div>
     </div>
-  </header>
-
+    <!-- ***** Preloader End ***** -->
+        
+    <%@ include file="header.jsp" %>
+  
     <div class="auth-container">
         <h2>Login</h2>
 
        <form action="LoginServlet" method="POST">
+           <input type="hidden" name="redirect" value="<%= request.getParameter("redirect") != null ? request.getParameter("redirect") : "" %>">
             <input type="email" name="email" placeholder="Email" required>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit" class="auth-btn">Login</button>

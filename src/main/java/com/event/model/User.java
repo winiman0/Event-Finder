@@ -10,6 +10,10 @@ public class User implements Serializable {
     private String password;
     private String role;
     private String campusID;
+    private String phoneNumber;
+    private String faculty;
+    private String campusName;
+    private String campusState;
 
     // 1. Constructor (Empty)
     public User() {}
@@ -32,4 +36,17 @@ public class User implements Serializable {
 
     public String getCampusID() { return campusID; }
     public void setCampusID(String campusID) { this.campusID = campusID; }
+    
+    public String getPhoneNumber() {return phoneNumber;}
+    public void setPhoneNumber(String phoneNumber) {this.phoneNumber=phoneNumber;}
+    
+    public String getFaculty() {return faculty;}
+    public void setFaculty(String faculty){this.faculty=faculty;}
+    
+    public String getCampusName() { return campusName; }
+    public void setCampusName(String campusName) { this.campusName = campusName; }
+    
+    public String getCampusState() { return campusState; }
+    public void setCampusState(String campusState) { this.campusState = campusState; }
+
 }
