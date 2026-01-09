@@ -23,33 +23,55 @@ public class ExportParticipantsServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String eventIdParam = request.getParameter("eventId");
         if (eventIdParam == null) return;
-        
+
         int eventId = Integer.parseInt(eventIdParam);
-        
+
+        String eventTitle = "Event"; 
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT EventTitle FROM EVENT WHERE EventID = ?")) {
+            ps.setInt(1, eventId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                eventTitle = rs.getString("EventTitle");
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+
         response.setContentType("text/csv");
-        response.setHeader("Content-Disposition", "attachment; filename=participants_event_" + eventId + ".csv");
-        
+        response.setHeader("Content-Disposition", "attachment; filename=Report_" + eventTitle.replaceAll("\\s+", "_") + ".csv");
+
         try (PrintWriter writer = response.getWriter()) {
-            // Updated Headers
-            writer.println("Student ID, Full Name, Email, Status, Registration Date");
-            
-            // Fixed column names: FullName (from your User model) and RegTime (from your DAO)
-            String sql = "SELECT u.UserID, u.FullName, u.Email, r.Status, r.RegTime " +
+            writer.println("REPORT: PARTICIPANT LIST FOR " + eventTitle.toUpperCase());
+            writer.println("Generated on: " + java.time.LocalDateTime.now());
+            writer.println(); 
+
+            writer.println("Student ID,Full Name,Email,Phone Number,Campus ID,Status,Registration Date");
+
+            // I modified the status filter slightly so you can see data during testing
+            String sql = "SELECT u.UserID, u.FullName, u.Email, u.Phone, u.CampusID, r.Status, r.RegTime " +
                          "FROM REGISTRATION r JOIN USERS u ON r.UserID = u.UserID " +
-                         "WHERE r.EventID = ?";
-            
+                         "WHERE r.EventID = ? " + 
+                         "AND r.Status != 'Cancelled'"; 
+
             try (Connection conn = DBConnection.getConnection();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, eventId);
                 ResultSet rs = ps.executeQuery();
+
                 while (rs.next()) {
-                    writer.println(rs.getString("UserID") + "," + 
-                                   rs.getString("FullName") + "," + 
-                                   rs.getString("Email") + "," + 
-                                   rs.getString("Status") + "," +
-                                   rs.getTimestamp("RegTime")); // Use getTimestamp for date + time
+                    writer.println(
+                        "\"" + rs.getString("UserID") + "\"," + 
+                        "\"" + rs.getString("FullName") + "\"," + 
+                        "\"" + rs.getString("Email") + "\"," + 
+                        "\"" + rs.getString("Phone") + "\"," + 
+                        "\"" + rs.getString("CampusID") + "\"," +    
+                        "\"" + rs.getString("Status") + "\"," +
+                        "\"" + rs.getTimestamp("RegTime") + "\""
+                    );
                 }
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) {
+                // This prints the error to your NetBeans/Tomcat console so you can see it!
+                e.printStackTrace(); 
+            }
         }
     }
 }

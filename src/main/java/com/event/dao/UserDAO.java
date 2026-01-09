@@ -111,4 +111,63 @@ public class UserDAO {
         } catch (Exception e) { e.printStackTrace(); }
         return list;
     }
+    
+    public boolean updateProfile(User user) {
+        boolean success = false;
+        // We update everything EXCEPT UserID and CampusID/Role for security
+        String sql = "UPDATE USERS SET FullName = ?, Email = ?, Phone = ?, Faculty = ? WHERE UserID = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, user.getFullName());
+            ps.setString(2, user.getEmail());
+            ps.setString(3, user.getPhoneNumber());
+            ps.setString(4, user.getFaculty());
+            ps.setString(5, user.getUserID());
+
+            int rows = ps.executeUpdate();
+            if (rows > 0) success = true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return success;
+    }
+    
+    public int getUserTotalMerit(String userID) {
+        int total = 0;
+        // Only count points where an admin has confirmed attendance
+        String sql = "SELECT SUM(e.EventPoints) FROM REGISTRATION r " +
+                     "JOIN EVENT e ON r.EventID = e.EventID " +
+                     "WHERE r.UserID = ? AND r.Status = 'Attended'";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, userID);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                total = rs.getInt(1);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return total;
+    }
+    
+    public List<String[]> getMeritHistory(String userID) {
+        List<String[]> history = new ArrayList<>();
+        String sql = "SELECT e.EventName, e.EventPoints FROM REGISTRATION r " +
+                     "JOIN EVENT e ON r.EventID = e.EventID " +
+                     "WHERE r.UserID = ? AND r.Status = 'Attended'";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, userID);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                // Store as a pair: {Event Name, Points}
+                history.add(new String[]{rs.getString("EventName"), rs.getString("EventPoints")});
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return history;
+    }
 }

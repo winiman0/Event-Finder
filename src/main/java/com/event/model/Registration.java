@@ -6,6 +6,8 @@ public class Registration {
     private String userID;
     private int eventID;
     private Timestamp regDate;
+    private String fullName;
+    private String status;
 
     public Registration() {}
 
@@ -18,4 +20,8 @@ public class Registration {
     public void setEventID(int eventID) { this.eventID = eventID; }
     public Timestamp getRegDate() { return regDate; }
     public void setRegDate(Timestamp regDate) { this.regDate = regDate; }
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

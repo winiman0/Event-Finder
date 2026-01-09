@@ -12,9 +12,10 @@
     boolean isAdmin = (user != null && "admin".equalsIgnoreCase(user.getRole()));
     List<Event> events = (dao.getAllEvents() != null) ? dao.getAllEvents() : new ArrayList<>();
     LocalDate today = LocalDate.now();
-    List<String> allCampuses = dao.getAllCampusesFromTable(); 
+    List<String> allCampuses = dao.getAllCampusesFromTable();
+  
     
-    String[] eventTypes = {"Club Activity", "Gathering", "Workshop", "Talk", "Volunteering", "Meeting", "Competition (General)", "Trip", "Ceremony", "Entrepreneurship", "Arts and Performance", "Seminar", "Sports (Competitive)", "Sports (Recreational)", "Exhibition"};
+    String[] eventTypes = {"Club Activity", "Gathering", "Workshop", "Talk", "Volunteering", "Meeting", "Competition (General)", "Trip", "Ceremony", "Entrepreneurship", "Arts/Performance", "Seminar", "Sports (Competitive)", "Sports (Recreational)", "Exhibition"};
     request.setAttribute("activePage", "events");
 %>
 
@@ -91,6 +92,46 @@
 
         .nav-pills .nav-link.active { background-color: #2a2a2a; }
         .empty-placeholder { background: #fff; border: 2px dashed #ddd; border-radius: 15px; padding: 50px; text-align: center; color: #999; }
+        .event-badges {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .badge-item {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .bg-campus { background-color: #e3f2fd; color: #0d47a1; } /* Light Blue */
+        .bg-type { background-color: #f3e5f5; color: #7b1fa2; }   /* Light Purple */
+        .bg-merit { background-color: #e8f5e9; color: #2e7d32; }  /* Light Green */
+
+        /* Status Badge Colors */
+        .bg-upcoming { background-color: #007bff; color: #fff; }  /* Blue */
+        .bg-ongoing { background-color: #28a745; color: #fff; }   /* Green */
+        .bg-completed { background-color: #6c757d; color: #fff; } /* Grey */
+        .bg-cancelled { background-color: #dc3545; color: #fff; } /* Red */
+
+        /* Status indicator dot */
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        @media (max-width: 768px) {
+    .event-item {
+        flex-direction: column;
+    }
+    .event-image-center {
+        min-width: 100%;
+        height: 200px;
+    }
+}
     </style>
 </head>
 <body>
@@ -141,7 +182,25 @@
                                     <label class="form-check-label" for="meritFilter">Merit Only</label>
                                 </div>
                             </div>
-
+                            <div class="filter-group mb-4">
+                                <h6 class="small text-uppercase font-weight-bold text-muted">Status</h6>
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input status-filter" type="checkbox" value="upcoming" id="stat_upcoming">
+                                    <label class="form-check-label" for="stat_upcoming">Upcoming</label>
+                                </div>
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input status-filter" type="checkbox" value="ongoing" id="stat_ongoing">
+                                    <label class="form-check-label" for="stat_ongoing">Ongoing</label>
+                                </div>
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input status-filter" type="checkbox" value="completed" id="stat_completed">
+                                    <label class="form-check-label" for="stat_completed">Completed</label>
+                                </div>
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input status-filter" type="checkbox" value="cancelled" id="stat_cancelled">
+                                    <label class="form-check-label" for="stat_cancelled">Cancelled</label>
+                                </div>
+                            </div>
                             <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="resetFilters()">Clear All</button>
                         </form>
                     </div>
@@ -163,97 +222,126 @@
                     </div>
 
                     <div class="tab-content" id="pills-tabContent">
-                        
-                        <div class="tab-pane fade show active" id="upcoming" role="tabpanel">
-                            <div class="row event-container">
-                                <% 
-                                boolean hasUpcoming = false;
-                                for(Event e : events) {
-                                    if (!e.getEventDate().toLocalDate().isBefore(today)) { 
-                                        hasUpcoming = true; 
-                                        int confirmedCount = regDao.getConfirmedCount(e.getEventID());
-                                    %>
-                                        <div class="col-lg-12 event-card" 
-                                             data-campus="<%= e.getEventVenue() %>" 
-                                             data-type="<%= e.getEventType() %>" 
-                                             data-merit="<%= e.getMeritPoints() > 0 %>">
-                                            <div class="event-item">
-                                                <div class="event-content-left">
-                                                    <h3><%= e.getEventTitle() %></h3>
-                                                    <p><%= (e.getDescription().length() > 100) ? e.getDescription().substring(0, 100) + "..." : e.getDescription() %></p>
-                                                    
-                                                    <a href="event-details.jsp?id=<%= e.getEventID() %>" class="btn-event">
-                                                        <%= isAdmin ? "Edit Event" : "View Details" %>
-                                                    </a>
-                                                </div>
+    
+                    <%-- SUCCESS/UPCOMING TAB --%>
+                    <div class="tab-pane fade show active" id="upcoming" role="tabpanel">
+                        <div class="row event-container">
+                            <% 
+                            boolean hasUpcoming = false;
+                            for(Event e : events) {
+                                if (!e.getEventDate().toLocalDate().isBefore(today)) { 
+                                    hasUpcoming = true;
+                                    String displayStatus = e.getStatus();
+                                    if (e.getEventDate().toLocalDate().equals(today)) {
+                                        displayStatus = "Ongoing";
+                                    }
+                                    int confirmedCount = regDao.getConfirmedCount(e.getEventID());
+                                        String imageName = (e.getImageURL() == null || e.getImageURL().isEmpty()) ? "empty_image.png" : e.getImageURL();
+                                        String imgPath = request.getContextPath() + "/getImage?name=" + imageName;
+                            %>
+                                <div class="col-lg-12 event-card" 
+                                     data-campus="<%= e.getCampusName() %>" 
+                                     data-type="<%= e.getEventType() %>" 
+                                     data-merit="<%= e.getMeritPoints() > 0 %>"
+                                     data-status="<%= e.getStatus().toLowerCase() %>">
+                                    <div class="event-item">
+                                        <div class="event-content-left">
+                                            <h3><%= e.getEventTitle() %></h3>
+                                            <div class="event-badges">
+                                                <span class="badge-item bg-<%= e.getStatus().toLowerCase() %>">
+                                                    <span class="status-dot"></span> <%= e.getStatus().toUpperCase() %>
+                                                </span>
+                                                <% if(e.getCampusName() != null) { %><span class="badge-item bg-campus"><i class="fa fa-university"></i> <%= e.getCampusName() %></span><% } %>
+                                                <% if(e.getEventType() != null) { %><span class="badge-item bg-type"><%= e.getEventType() %></span><% } %>
+                                                <% if(e.getMeritPoints() > 0) { %><span class="badge-item bg-merit"><i class="fa fa-star"></i> <%= e.getMeritPoints() %> Merit</span><% } %>
+                                            </div>
+                                            <p><%= (e.getDescription().length() > 100) ? e.getDescription().substring(0, 100) + "..." : e.getDescription() %></p>
+                                            <a href="event-details.jsp?id=<%= e.getEventID() %>" class="btn-event">
+                                                <%= isAdmin ? "Manage Event" : "View Details" %>
+                                            </a>
+                                        </div>
 
-                                                <div class="event-image-center">
-                                                    <img src="assets/images/events/<%= e.getImageURL() %>" alt="<%= e.getEventTitle() %>">
-                                                </div>
+                                        <div class="event-image-center">
+                                            <img src="<%= imgPath %>" onerror="this.src='assets/images/empty_image.png';" alt="Event">
+                                        </div>
 
-                                                <div class="event-info-right">
-                                                    <div class="info-row">
-                                                        <i class="fa fa-clock-o"></i>
-                                                        <div>
-                                                            <strong><%= e.getEventDate().toLocalDate().format(DateTimeFormatter.ofPattern("MMM dd")) %></strong>
-                                                            <% 
-                                                                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("hh:mm a"); 
-                                                             %>
-                                                            <span><%= e.getStartTime() %> - <%= e.getEndTime() %></span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="info-row">
-                                                        <i class="fa fa-map-marker"></i>
-                                                        <div><%= e.getEventVenue() %></div>
-                                                    </div>
-                                                    <div class="info-row">
-                                                        <i class="fa fa-users"></i>
-                                                        <div><%= confirmedCount %> Guests Attending</div>
-                                                    </div>
+                                        <div class="event-info-right">
+                                            <div class="info-row">
+                                                <i class="fa fa-clock-o"></i>
+                                                <div>
+                                                    <strong><%= e.getEventDate().toLocalDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) %></strong>
+                                                    <span><%= e.getStartTime() %> - <%= e.getEndTime() %></span>
                                                 </div>
                                             </div>
-                                        </div>
-                                <% } } 
-                                if (!hasUpcoming) { %>
-                                    <div class="col-12"><div class="empty-placeholder"><h3>No upcoming events.</h3><p>Time to create one!</p></div></div>
-                                <% } %>
-                            </div>
-                        </div>
-
-                        <div class="tab-pane fade" id="past" role="tabpanel">
-                            <div class="row event-container">
-                                <% 
-                                boolean hasPast = false;
-                                for(Event e : events) {
-                                    if (e.getEventDate().toLocalDate().isBefore(today)) { 
-                                        hasPast = true; 
-                                        int confirmedCount = regDao.getConfirmedCount(e.getEventID());
-                                        %>
-                                        <div class="col-lg-12 event-card" style="opacity: 0.7;"
-                                             data-campus="<%= e.getEventVenue() %>" 
-                                             data-type="<%= e.getEventType() %>" 
-                                             data-merit="<%= e.getMeritPoints() > 0 %>">
-                                            <div class="event-item">
-                                                <div class="row align-items-center">
-                                                    <div class="col-md-8">
-                                                        <h4 class="text-muted"><%= e.getEventTitle() %></h4>
-                                                        <p class="small">Completed on: <%= e.getEventDate() %></p>
-                                                        <p class="small"><i class="fa fa-users"></i> <%= confirmedCount %> Total Attendees</p>
-                                                    </div>
-                                                    <div class="col-md-4 text-right">
-                                                        <span class="badge badge-secondary p-2">Archive</span>
-                                                    </div>
-                                                </div>
+                                            <div class="info-row">
+                                                <i class="fa fa-map-marker"></i>
+                                                <div><strong><%= e.getEventVenue() %></strong></div>
+                                            </div>
+                                            <div class="info-row">
+                                                <i class="fa fa-users"></i>
+                                                <div><%= confirmedCount %> / <%= e.getMaxCapacity() %> Attending</div>
                                             </div>
                                         </div>
-                                <% } } 
-                                if (!hasPast) { %>
-                                    <div class="col-12"><div class="empty-placeholder"><h3>Archive is empty.</h3></div></div>
-                                <% } %>
-                            </div>
+                                    </div>
+                                </div>
+                            <% } } 
+                            if (!hasUpcoming) { %>
+                                <div class="col-12"><div class="empty-placeholder"><h3>No upcoming events found.</h3></div></div>
+                            <% } %>
                         </div>
+                    </div>
 
-                    </div> </div> </div>
+                    <%-- PAST TAB (Now using the same layout) --%>
+                    <div class="tab-pane fade" id="past" role="tabpanel">
+                        <div class="row event-container">
+                            <% 
+                            boolean hasPast = false;
+                            for(Event e : events) {
+                                if (e.getEventDate().toLocalDate().isBefore(today)) { 
+                                    hasPast = true; 
+                                    String displayStatus = e.getStatus();
+                                    if (e.getEventDate().toLocalDate().equals(today)) {
+                                        displayStatus = "Ongoing";
+                                    }
+                                    int confirmedCount = regDao.getConfirmedCount(e.getEventID());
+                                    String imageNamePast = (e.getImageURL() == null || e.getImageURL().isEmpty()) ? "empty_image.png" : e.getImageURL();
+                                    String imgPathPast = request.getContextPath() + "/getImage?name=" + imageNamePast;
+                            %>
+                                <div class="col-lg-12 event-card" style="opacity: 0.8; filter: grayscale(0.5);"
+                                     data-campus="<%= e.getCampusName() %>" 
+                                     data-type="<%= e.getEventType() %>" 
+                                     data-merit="<%= e.getMeritPoints() > 0 %>"
+                                     data-status="<%= e.getStatus().toLowerCase() %>">
+                                    <div class="event-item">
+                                        <div class="event-content-left">
+                                            <div class="event-badges">
+                                                <span class="badge-item bg-<%= e.getStatus().toLowerCase() %>">
+                                                    <span class="status-dot"></span> <%= e.getStatus().toUpperCase() %>
+                                                </span>
+                                                <% if(e.getCampusName() != null) { %><span class="badge-item bg-campus"><%= e.getCampusName() %></span><% } %>
+                                            </div>
+                                            <h3><%= e.getEventTitle() %></h3>
+                                            <p><%= (e.getDescription().length() > 100) ? e.getDescription().substring(0, 100) + "..." : e.getDescription() %></p>
+                                            <a href="event-details.jsp?id=<%= e.getEventID() %>" class="btn-event" style="background-color: #666;">View Archive</a>
+                                        </div>
+
+                                        <div class="event-image-center">
+                                            <img src="<%= imgPathPast %>" onerror="this.src='assets/images/empty_page.png';" alt="Event">
+                                        </div>
+
+                                        <div class="event-info-right">
+                                            <div class="info-row"><i class="fa fa-calendar-check-o"></i> <div><strong>Completed</strong><span><%= e.getEventDate() %></span></div></div>
+                                            <div class="info-row"><i class="fa fa-users"></i> <div><%= confirmedCount %> Total Participants</div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% } } 
+                            if (!hasPast) { %>
+                                <div class="col-12"><div class="empty-placeholder"><h3>No past events in archive.</h3></div></div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div></div> </div>
         </div>
     </div>
     <!-- *** Footer *** -->
@@ -280,20 +368,12 @@
                             <div class="col-lg-6">
                                 <div class="menu">
                                     <ul>
-                                        <li><a href="index.html" class="active">Home</a></li>
-                                        <li><a href="about.html">About Us</a></li>
-                                        <li><a href="shows-events.html">Shows & Events</a></li> 
+                                        <li><a href="index.jsp" class="active">Home</a></li>
+                                        <li><a href="ad_event.jsp">Shows & Events</a></li> 
                                     </ul>
                                 </div>
                             </div>
-                            <div class="col-lg-3">
-                                <div class="social-links">
-                                    <ul>
-                                        <li><a href="https://www.facebook.com/uitmrasmi/?locale=ms_MY"><i class="fa fa-facebook"></i></a></li>
-                                        <li><a href="https://www.instagram.com/uitm.official/"><i class="fa fa-instagram"></i></a></li>
-                                    </ul>
-                                </div>
-                            </div>
+                           
                         </div>
                     </div>
                 </div>
@@ -304,29 +384,52 @@
     <script src="assets/js/jquery-2.1.0.min.js"></script>
     <script src="assets/js/bootstrap.min.js"></script>
     <script>
-        // Use the same filter function you already had
         function filterEvents() {
-            const selectedCampuses = Array.from(document.querySelectorAll('.campus-filter:checked')).map(cb => cb.value);
-            const selectedType = document.getElementById('typeFilter').value;
-            const meritOnly = document.getElementById('meritFilter').checked;
+        // 1. Get values from Campus, Type, and Merit
+        const selectedCampuses = Array.from(document.querySelectorAll('.campus-filter:checked')).map(cb => cb.value);
+        const selectedType = document.getElementById('typeFilter').value;
+        const meritOnly = document.getElementById('meritFilter').checked;
 
-            document.querySelectorAll('.event-card').forEach(card => {
-                const cardCampus = card.getAttribute('data-campus');
-                const cardType = card.getAttribute('data-type');
-                const hasMerit = card.getAttribute('data-merit') === 'true';
+        // 2. NEW: Get all checked Statuses (upcoming, ongoing, etc.)
+        const selectedStatuses = Array.from(document.querySelectorAll('.status-filter:checked')).map(cb => cb.value);
 
-                let show = true;
-                if (selectedCampuses.length > 0 && !selectedCampuses.includes(cardCampus)) show = false;
-                if (selectedType !== 'all' && cardType !== selectedType) show = false;
-                if (meritOnly && !hasMerit) show = false;
+        document.querySelectorAll('.event-card').forEach(card => {
+            const cardCampus = card.getAttribute('data-campus');
+            const cardType = card.getAttribute('data-type');
+            const hasMerit = card.getAttribute('data-merit') === 'true';
+            const cardStatus = card.getAttribute('data-status'); // Get the status
 
-                card.style.display = show ? "block" : "none";
-            });
-        }
+            let show = true;
 
-        document.querySelectorAll('.form-check-input, #typeFilter').forEach(input => {
-            input.addEventListener('change', filterEvents);
+            // Existing filters
+            if (selectedCampuses.length > 0 && !selectedCampuses.includes(cardCampus)) show = false;
+            if (selectedType !== 'all' && cardType !== selectedType) show = false;
+            if (meritOnly && !hasMerit) show = false;
+
+            // 3. NEW: Status Filter Logic
+            // If the user checked any status boxes, hide cards that don't match
+            if (selectedStatuses.length > 0 && !selectedStatuses.includes(cardStatus)) {
+                show = false;
+            }
+
+            card.style.display = show ? "block" : "none";
         });
+    }
+
+    // Make sure the status checkboxes trigger the filter too!
+    document.querySelectorAll('.status-filter').forEach(input => {
+        input.addEventListener('change', filterEvents);
+    });
+    
+    document.querySelectorAll('.campus-filter').forEach(input => {
+    input.addEventListener('change', filterEvents);
+});
+
+// 3. Event Type dropdown (NEW)
+document.getElementById('typeFilter').addEventListener('change', filterEvents);
+
+// 4. Merit checkbox (NEW)
+document.getElementById('meritFilter').addEventListener('change', filterEvents);
 
         function resetFilters() {
             document.getElementById('filterForm').reset();

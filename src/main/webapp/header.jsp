@@ -23,6 +23,7 @@
                         <%-- ADMIN VIEW --%>
                         <% if ("admin".equalsIgnoreCase(role)) { %>
                             <li><a href="admin_dashboard.jsp" class="<%= active.equals("dashboard") ? "active" : "" %>">Dashboard</a></li>
+                            <li><a href="manage_participants.jsp" class="<%= active.equals("participants") ? "active" : "" %>">Participants</a></li>
                             <li><a href="ad_event.jsp" class="<%= active.equals("events") ? "active" : "" %>">Shows & Events</a></li>
                             <li><a href="users.jsp" class="<%= active.equals("users") ? "active" : "" %>">Users</a></li>
 

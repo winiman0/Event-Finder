@@ -21,7 +21,6 @@
 
     request.setAttribute("activePage", "dashboard");
 %>
-<% request.setAttribute("activePage", "dashboard"); %>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -35,6 +34,7 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
     <script src="https://unpkg.com/@popperjs/core@2"></script>
     <script src="https://unpkg.com/tippy.js@6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Dashboard</title>
 
 
@@ -136,8 +136,13 @@
     
     .fc-event {
         cursor: pointer;
-        background-color: #fb3f3f !important; /* Your Digitific Red */
+        background-color: #E8769C !important;
         border: none !important;
+        color: white;
+    }
+
+    .fc-button-primary:hover { 
+        background-color: #7266f0 !important; 
     }
     #calendar {
         max-width: 900px;
@@ -224,33 +229,83 @@
             <h2>Registrations Per Event</h2>
         </div>
 
-        <table>
-            <tr>
-                <th>Event Name</th>
-                <th>Total Registrations</th>
-            </tr>
-            <%
-                java.util.List<String[]> report = dao.getRegistrationsPerEvent();
-                if (report == null || report.isEmpty()) {
-            %>
-                <tr>
-                    <td colspan="2" style="text-align: center; padding: 30px; color: #888;">
-                        <i class="fa fa-info-circle"></i> There are currently no registrations to display.
-                    </td>
-                </tr>
-            <%
-                } else {
-                    for(String[] row : report) {
-            %>
-                <tr>
-                    <td><strong><%= row[0] %></strong></td>
-                    <td><span class="badge badge-danger" style="background:#fb3f3f;"><%= row[1] %> Joined</span></td>
-                </tr>
-            <% 
-                    } 
-                } 
-            %>
-        </table>
+        <div class="report-container" style="background: white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 50px;">
+            <table class="report-table" style="margin-top: 0; border-radius: 0;">
+                <thead>
+                    <tr>
+                        <th>Event Name</th>
+                        <th style="width: 250px;">Total Registrations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <%
+                        java.util.List<String[]> report = dao.getRegistrationsPerEvent();
+                        if (report == null || report.isEmpty()) {
+                    %>
+                        <tr>
+                            <td colspan="2" style="text-align: center; padding: 30px; color: #888;">
+                                <i class="fa fa-info-circle"></i> There are currently no registrations to display.
+                            </td>
+                        </tr>
+                    <%
+                        } else {
+                            for(String[] row : report) {
+                    %>
+                        <tr>
+                            <td><strong><%= row[0] %></strong></td>
+                            <td><span class="badge" style="background:#fb3f3f; color: white; padding: 8px 12px;"><%= row[1] %> Joined</span></td>
+                        </tr>
+                    <%  
+                            } 
+                        } 
+                    %>
+                </tbody>
+            </table>
+
+            <div style="padding: 30px; border-top: 1px solid #eee; background: #fdfdfd;">
+                <h4 style="font-size: 16px; margin-bottom: 20px; color: #666; text-transform: uppercase; letter-spacing: 1px;">Visual Analytics</h4>
+                <div style="height: 300px; width: 100%; padding-bottom: 20px;">
+                    <canvas id="registrationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+                <!-- *** Footer *** -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="under-footer">
+                        <div class="rowFooter">
+                            <div class="col-lg-6 col-sm-6 ms-auto text-end">
+                                <p class="copyright">Copyright 2025 Digitific Company 
+                    
+                    			<br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-12">
+                    <div class="sub-footer">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="logo"><span><em>Digitific</em></span></div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="menu">
+                                    <ul>
+                                        <li><a href="index.jsp" class="active">Home</a></li>
+                                        <li><a href="ad_event.jsp">Shows & Events</a></li> 
+                                    </ul>
+                                </div>
+                            </div>
+                           
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     </div>
       <!-- jQuery -->
@@ -294,8 +349,8 @@
                             venue: '<%= e.getEventVenue().replace("'", "\\'") %>',
                             type: '<%= e.getEventType() %>'
                         },
-                        backgroundColor: '#fb3f3f', // Admin default to Brand Red
-                        borderColor: '#fb3f3f',
+                        backgroundColor: '#E8769C', 
+                        borderColor: '#E8769C',
                         url: 'event-details.jsp?id=<%= e.getEventID() %>'
                     },
                     <% } %>
@@ -324,5 +379,57 @@
             calendar.render();
         });
         </script> 
+        <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var ctx = document.getElementById('registrationChart').getContext('2d');
+        
+        // Prepare Data from Java List to JavaScript Arrays
+        var eventLabels = [];
+        var registrationData = [];
+        
+        <% if (report != null) { 
+            for(String[] row : report) { %>
+                eventLabels.push("<%= row[0].replace("\"", "\\\"") %>");
+                registrationData.push(<%= row[1] %>);
+        <%  } 
+        } %>
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: eventLabels,
+                datasets: [{
+                    label: 'Registrations',
+                    data: registrationData,
+                    backgroundColor: 'rgba(251, 63, 63, 0.7)', // Digitific Red with transparency
+                    borderColor: '#fb3f3f',
+                    borderWidth: 2,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        bottom: 10 
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    });
+    </script>
 </body>
 </html>

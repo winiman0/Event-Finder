@@ -209,26 +209,19 @@
                             <div class="col-lg-6">
                                 <div class="menu">
                                     <ul>
-                                        <li><a href="index.html" class="active">Home</a></li>
-                                        <li><a href="about.html">About Us</a></li>
-                                        <li><a href="shows-events.html">Shows & Events</a></li> 
+                                        <li><a href="index.jsp" class="active">Home</a></li>
+                                        <li><a href="ad_event.jsp">Shows & Events</a></li> 
                                     </ul>
                                 </div>
                             </div>
-                            <div class="col-lg-3">
-                                <div class="social-links">
-                                    <ul>
-                                        <li><a href="https://www.facebook.com/uitmrasmi/?locale=ms_MY"><i class="fa fa-facebook"></i></a></li>
-                                        <li><a href="https://www.instagram.com/uitm.official/"><i class="fa fa-instagram"></i></a></li>
-                                    </ul>
-                                </div>
-                            </div>
+                           
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </footer>
+
 
     <script src="assets/js/jquery-2.1.0.min.js"></script>
     <script src="assets/js/bootstrap.min.js"></script>

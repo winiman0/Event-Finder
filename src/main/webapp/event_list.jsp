@@ -1,11 +1,9 @@
 <%-- 
     Document   : event_list
-    Created on : Jan 6, 2026, 11:49:23 PM
-    Author     : User
+    Created on : Jan 6, 2026
 --%>
-
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
-<%@page import="com.event.model.Event, com.event.model.User, com.event.dao.RegistrationDAO, java.util.List"%>
+<%@page import="com.event.model.Event, com.event.model.User, com.event.dao.RegistrationDAO, java.util.List, java.util.ArrayList"%>
 <%
     User user = (User) session.getAttribute("user");
     if (user == null) {
@@ -15,319 +13,293 @@
 
     RegistrationDAO regDao = new RegistrationDAO();
     List<Event> upcomingEvents = regDao.getEventsByUser(user.getUserID(), true);
-    List<Event> pastEvents = regDao.getEventsByUser(user.getUserID(), false);
+    List<Event> pastEventsRaw = regDao.getEventsByUser(user.getUserID(), false);
+    List<Event> allWaiting = regDao.getWaitingListByUser(user.getUserID()); 
     
-    int upcomingCount = regDao.getCountByUser(user.getUserID(), "upcoming");
-    int weekCount = regDao.getCountByUser(user.getUserID(), "week");
-    int totalJoined = regDao.getCountByUser(user.getUserID(), "total");
+    List<Event> waitingEvents = new ArrayList<>();
+    List<Event> pastEvents = new ArrayList<>(pastEventsRaw);
+    java.time.LocalDate today = java.time.LocalDate.now();
     
-    //Calendar 
-    List<Event> allMyEvents = new java.util.ArrayList<>();
+    for(Event e : allWaiting) {
+        java.time.LocalDate eventDate = e.getEventDate().toLocalDate(); 
+        if(eventDate.isBefore(today)) { pastEvents.add(e); } 
+        else { waitingEvents.add(e); }
+    }
+
+    int upcomingCount = upcomingEvents.size();
+    int waitingCount = waitingEvents.size();
+    int totalJoined = upcomingCount + pastEvents.size();
+
+    List<Event> allMyEvents = new ArrayList<>();
     allMyEvents.addAll(upcomingEvents);
     allMyEvents.addAll(pastEvents);
-    
+    allMyEvents.addAll(waitingEvents);
+
     request.setAttribute("activePage", "myevents");
 %>
 <%@ include file="header.jsp" %>
+
 <!DOCTYPE html>
 <html lang="en">
-
-  <head>
-
+<head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="Tooplate">
-    <link href="https://fonts.googleapis.com/css?family=Poppins:100,100i,200,200i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i&display=swap" rel="stylesheet">
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
-
-    <title>Digitific: Your Events</title>
-
-
-    <!-- Additional CSS Files -->
+    <title>Digitific | Dashboard</title>
     <link rel="stylesheet" type="text/css" href="assets/css/bootstrap.min.css">
-
     <link rel="stylesheet" type="text/css" href="assets/css/font-awesome.css">
-
-    <link rel="stylesheet" type="text/css" href="assets/css/owl-carousel.css">
-
     <link rel="stylesheet" href="assets/css/tooplate-artxibition.css">
-<!--
-
-Tooplate 2125 ArtXibition
-
-https://www.tooplate.com/view/2125-artxibition
-
--->
-
-    <style>
-        .fc-event { cursor: pointer; border: none; padding: 2px 5px; }
-        .fc-toolbar-title { color: #2a2a2a; font-weight: 700; }
-        .fc-button-primary { background-color: #fb3f3f !important; border: none !important; }
-        .fc-daygrid-event-dot { border-color: #fb3f3f !important; }
-        .tooltip-inner {
-            background-color: #2a2a2a !important; /* Dark background */
-            color: #fff;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 13px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        .bs-tooltip-top .arrow::before, .bs-tooltip-auto[x-placement^="top"] .arrow::before {
-            border-top-color: #2a2a2a !important;
-        }
-    </style>
-    </head>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
     
-    <body>
-    <!-- ***** Preloader Start ***** -->
-    <div id="js-preloader" class="js-preloader">
-      <div class="preloader-inner">
-        <span class="dot"></span>
-        <div class="dots">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
-    </div>
-    <!-- ***** Preloader End ***** -->
+    <style>
+        body { background-color: rgba(124, 107, 142, 1) !important; overflow-x: hidden; }
 
-    <!-- ***** About Us Page ***** -->
+        /* THE GLASS DASHBOARD */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 25px;
+            height: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        #calendar-container { background: #ffffff; border-radius: 20px; padding: 20px; height: 750px; }
+
+        .control-panel-title {
+            color: white;
+            letter-spacing: 2px;
+            font-size: 23px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        /* STAT CARDS */
+        .stat-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .stat-card:hover { border-color: #DDFF7F; background: rgba(255,255,255,0.12); }
+        .stat-card.active { background: rgba(221, 255, 127, 0.1); border: 2px solid #DDFF7F; }
+        .stat-card label { color: #eee; font-size: 10px; text-transform: uppercase; display: block; cursor: pointer; margin-bottom: 5px; }
+        .stat-card span { color: #DDFF7F; font-size: 24px; font-weight: 800; display: block; }
+
+        /* SCROLLABLE LIST */
+        .scroll-list { height: 430px; overflow-y: auto; padding-right: 8px; }
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb { background: rgba(221, 255, 127, 0.3); border-radius: 10px; }
+
+        .event-mini-card {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: block;
+            text-decoration: none !important;
+            transition: 0.2s;
+        }
+        .event-mini-card:hover { transform: translateX(5px); background: #fdfdfd; }
+        .event-mini-card h5 { font-size: 14px; font-weight: 700; color: #333; margin: 0; }
+        .event-mini-card p { font-size: 11px; color: #777; margin: 0; }
+        
+        .empty-state {
+            background: rgba(255,255,255,0.05);
+            border: 1px dashed rgba(255,255,255,0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .badge-neon { background: #DDFF7F; color: #2D1B4E; font-size: 10px; padding: 4px 10px; border-radius: 10px; font-weight: 700; }
+    </style>
+</head>
+
+<body>
     <div class="page-heading-rent-venue">
         <div class="container">
-            <div class="row">
-                <div class="col-lg-12">
-                    <h2>Your Events</h2>
-                    <span>Check out your events.</span>
+            <h2>Your Events</h2>
+            <span>Manage your schedule and history in one place.</span>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-4 px-4 pb-5">
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="glass-panel">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2 style="color: white; font-weight: 800; margin:0;">Event Calendar</h2>
+                        <span class="badge-neon">LIVE VIEW</span>
+                    </div>
+                    <div id='calendar-container'>
+                        <div id='calendar'></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="glass-panel">
+                    <span class="control-panel-title">Activity Overview</span>
+                    
+                    <div class="stat-stack">
+                        <div class="stat-card active" onclick="filterList('upcoming', this)">
+                            <label>Upcoming</label>
+                            <span><%= upcomingCount %></span>
+                        </div>
+                        <div class="stat-card" onclick="filterList('waiting', this)">
+                            <label>Waitlist</label>
+                            <span><%= waitingCount %></span>
+                        </div>
+                        <div class="stat-card" onclick="filterList('all', this)" style="grid-column: span 2;">
+                            <label>Total Experience / History</label>
+                            <span><%= totalJoined %></span>
+                        </div>
+                    </div>
+
+                    <span class="control-panel-title" id="list-title">Upcoming Schedule</span>
+                    
+                    <div class="scroll-list" id="event-list">
+                        
+                        <div class="list-section" id="upcoming-section">
+                            <% if(upcomingEvents.isEmpty()) { %>
+                                <div class="empty-state">No upcoming events found.</div>
+                            <% } else { for(Event e : upcomingEvents) { %>
+                                <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5><%= e.getEventTitle() %></h5>
+                                            <p><i class="fa fa-calendar"></i> <%= e.getEventDate() %></p>
+                                        </div>
+                                        <span class="badge badge-success" style="font-size: 9px;">Confirmed</span>
+                                    </div>
+                                </a>
+                            <% } } %>
+                        </div>
+
+                        <div class="list-section" id="waiting-section" style="display:none;">
+                            <% if(waitingEvents.isEmpty()) { %>
+                                <div class="empty-state">No active waitlists.</div>
+                            <% } else { for(Event e : waitingEvents) { %>
+                                <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card">
+                                    <h5><%= e.getEventTitle() %></h5>
+                                    <p><i class="fa fa-clock-o"></i> Waitlisted</p>
+                                </a>
+                            <% } } %>
+                        </div>
+
+                        <div class="list-section" id="history-section" style="display:none;">
+                            <% if(pastEvents.isEmpty()) { %>
+                                <div class="empty-state">No past event history.</div>
+                            <% } else { for(Event e : pastEvents) { 
+                                boolean wasVerified = "Attended".equalsIgnoreCase(e.getStatus());
+                            %>
+                                <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card">
+                                    <h5><%= e.getEventTitle() %></h5>
+                                    <p>
+                                        <% if(wasVerified) { %>
+                                            <span class="badge badge-success">Points Earned: +<%= e.getMeritPoints() %></span>
+                                        <% } else { %>
+                                            <span class="badge badge-secondary">Attendance Not Verified</span>
+                                        <% } %>
+                                        | <%= e.getEventDate() %>
+                                    </p>
+                                </a>
+                            <% } } %>
+                        </div>
+
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="shows-events-schedule">
-        <!-- USER DASHBOARD -->
-        <div class="counter-content dashboard-counter">
-        <ul>
-            <li>Upcoming<span id="stat-upcoming"><%= upcomingCount %></span></li>
-            <li>This Week<span id="stat-week"><%= weekCount %></span></li>
-            <li>Total Joined<span id="stat-joined"><%= totalJoined %></span></li>
-        </ul>
-    </div>
-
-    <div class="container mt-5 mb-5">
-        <div class="row">
-            <div class="col-lg-12">
-                <div id='calendar-container' style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0px 10px 30px rgba(0,0,0,0.1);">
-                    <div id='calendar'></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- ***** Main Banner Area End ***** -->
-    <section class="user-dashboard section" id="user-dashboard">
+<!-- *** Footer *** -->
+    <footer>
         <div class="container">
             <div class="row">
-                <!-- Upcoming Events (User Joined) -->
-                <div class="section-heading">
-                            <h2>Your Upcoming Event</h2>
-                </div>
                 <div class="col-lg-12">
-                        <ul>
-                            <% if(upcomingEvents.isEmpty()) { %>
-                                <p class="text-center">No upcoming events. <a href="shows-events.jsp">Browse events here!</a></p>
-                            <% } else { 
-                                for(Event e : upcomingEvents) { %>
-                            <li>
-                                <div class="row">
-                                    <div class="col-lg-3">
-                                        <div class="title">
-                                            <h4><%= e.getEventTitle() %></h4>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="time"><span><i class="fa fa-clock-o"></i> <%= e.getEventDate() %><br><%= e.getStartTime() %> to <%= e.getEndTime() %></span></div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="place"><span><i class="fa fa-map-marker"></i><%= e.getEventVenue() %></span></div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="place"><span>Merit: <%= e.getMeritPoints() %></span></div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="main-dark-button">
-                                            <a href="event-details.jsp?id=<%= e.getEventID() %>" class="main-white-button">View Details</a>
-                                            <% if ("Waiting".equalsIgnoreCase(e.getStatus())) { %>
-                                                <span class="status-badge" style="background: #ffc107; color: #000; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-left: 10px;">
-                                                    <i class="fa fa-hourglass-half"></i> Waitlisted
-                                                </span>
-                                            <% } else { %>
-                                                <span class="status-badge" style="background: #28a745; color: #fff; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-left: 10px;">
-                                                    <i class="fa fa-check"></i> Confirmed
-                                                </span>
-                                            <% } %>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                            <div class="main-dark-button">
-                                                <a href="event-details.jsp?id=<%= e.getEventID() %>" class="main-white-button">View Details</a>
-                                                <span class="status joined">Registered</span>
-                                            </div>
-                                        </div>
-                                </div>
-                            </li>
-                            <% } } %>
-                        </ul>
-                    </div>
-                <!-- Past Events -->
-                <div class="section-heading">
-                <h2>Past Events</h2>
-                </div>
-                <div class="col-lg-12">
-                        <ul style="opacity: 0.7;"> <% for(Event e : pastEvents) { %>
-                            <li>
-                                <div class="row">
-                                    <div class="col-lg-3">
-                                        <div class="title">
-                                            <h4><%= e.getEventTitle() %></h4>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="time"><span><i class="fa fa-clock-o"></i> <%= e.getEventDate() %></span></div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="place"><span><i class="fa fa-map-marker"></i> <%= e.getEventVenue() %></span></div>
-                                    </div>
-                                    <div class="col-lg-3">
-                                        <div class="place"><span>Merit: <%= e.getMeritPoints() %></span></div>
-                                    </div>
-                                </div>
-                            </li>
-                            <% } %>
-                        </ul>
-                    </div>
-            </div>
-        </div>
-    </section>
-
-        </div>
-
-    <!-- *** Footer *** -->
-        <footer>
-            <div class="container">
-                <div class="row">
-                    <div class="col-lg-12">
-                        <div class="under-footer">
-                            <div class="rowFooter">
-                                <div class="col-lg-6 col-sm-6 ms-auto text-end">
-                                    <p class="copyright">Copyright 2025 Digitific Company 
-
-                                            <br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-12">
-                        <div class="sub-footer">
-                            <div class="row">
-                                <div class="col-lg-3">
-                                    <div class="logo"><span><em>Digitific</em></span></div>
-                                </div>
-                                <div class="col-lg-6">
-                                    <div class="menu">
-                                        <ul>
-                                            <li><a href="index.html" class="active">Home</a></li>
-                                            <li><a href="about.html">About Us</a></li>
-                                            <li><a href="shows-events.html">Shows & Events</a></li> 
-                                        </ul>
-                                    </div>
-                                </div>
-                                <div class="col-lg-3">
-                                    <div class="social-links">
-                                        <ul>
-                                            <li><a href="https://www.facebook.com/uitmrasmi/?locale=ms_MY"><i class="fa fa-facebook"></i></a></li>
-                                            <li><a href="https://www.instagram.com/uitm.official/"><i class="fa fa-instagram"></i></a></li>
-                                        </ul>
-                                    </div>
-                                </div>
+                    <div class="under-footer">
+                        <div class="rowFooter">
+                            <div class="col-lg-6 col-sm-6 ms-auto text-end">
+                                <p class="copyright">Copyright 2025 Digitific Company 
+                    
+                    			<br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
                             </div>
                         </div>
                     </div>
                 </div>
+                <div class="col-lg-12">
+                    <div class="sub-footer">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="logo"><span><em>Digitific</em></span></div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="menu">
+                                    <ul>
+                                        <li><a href="index.jsp" class="active">Home</a></li>
+                                        <li><a href="ad_event.jsp">Shows & Events</a></li> 
+                                    </ul>
+                                </div>
+                            </div>
+                           
+                        </div>
+                    </div>
+                </div>
             </div>
-        </footer>
-    
-    
+        </div>
+    </footer>
 
-    <!-- jQuery -->
     <script src="assets/js/jquery-2.1.0.min.js"></script>
-
-    <!-- Bootstrap -->
-    <script src="assets/js/popper.js"></script>
     <script src="assets/js/bootstrap.min.js"></script>
-
-    <!-- Plugins -->
-    <script src="assets/js/scrollreveal.min.js"></script>
-    <script src="assets/js/waypoints.min.js"></script>
-    <script src="assets/js/jquery.counterup.min.js"></script>
-    <script src="assets/js/imgfix.min.js"></script> 
-    <script src="assets/js/mixitup.js"></script> 
-    <script src="assets/js/accordions.js"></script>
-    <script src="assets/js/owl-carousel.js"></script>
-    
-    <!-- Global Init -->
-    <script src="assets/js/custom.js"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek'
-            },
-            events: [
-                <% for(Event e : allMyEvents) { %>
-                {
-                    id: '<%= e.getEventID() %>',
-                    title: '<%= e.getEventTitle().replace("'", "\\'") %>',
-                    start: '<%= e.getEventDate() %>T<%= e.getStartTime() %>',
-                    end: '<%= e.getEventDate() %>T<%= e.getEndTime() %>',
-                    extendedProps: {
-                        venue: '<%= e.getEventVenue().replace("'", "\\'") %>'
-                    },
-                    backgroundColor: '<%= "Waiting".equalsIgnoreCase(e.getStatus()) ? "#ffc107" : "#fb3f3f" %>',
-                    borderColor: '<%= "Waiting".equalsIgnoreCase(e.getStatus()) ? "#ffc107" : "#fb3f3f" %>',
-                    textColor: '<%= "Waiting".equalsIgnoreCase(e.getStatus()) ? "#000" : "#fff" %>',
-                    url: 'event-details.jsp?id=<%= e.getEventID() %>'
-                },
-                <% } %>
-            ],
-           
-            eventClick: function(info) {
-                // This makes the calendar dots clickable
-                if (info.event.url) {
-                    window.location.href = info.event.url;
-                    info.jsEvent.preventDefault(); // Prevents browser following link in new tab
-                }
-            },
-            // Show summary on hover/touch
-            eventDidMount: function(info) {
-                // This creates the Bootstrap tooltip
-                $(info.el).tooltip({
-                    title: "<strong>" + info.event.title + "</strong><br><i class='fa fa-map-marker'></i> " + info.event.extendedProps.venue,
-                    placement: 'top',
-                    trigger: 'hover',
-                    container: 'body',
-                    html: true // This allows us to use <strong> and <br> tags
-                });
-            },
-        });
-        calendar.render();
-    });
-    </script>
-  </body>
 
+    <script>
+        function filterList(type, el) {
+            $('.stat-card').removeClass('active');
+            $(el).addClass('active');
+            $('.list-section').hide();
+            
+            if(type === 'upcoming') {
+                $('#list-title').text('Upcoming Schedule');
+                $('#upcoming-section').fadeIn();
+            } else if(type === 'waiting') {
+                $('#list-title').text('Waitlist Status');
+                $('#waiting-section').fadeIn();
+            } else {
+                $('#list-title').text('Event History');
+                $('#history-section').fadeIn();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: '100%',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                events: [
+                    <% for(int i = 0; i < allMyEvents.size(); i++) { 
+                        Event e = allMyEvents.get(i); %>
+                    {
+                        id: '<%= e.getEventID() %>',
+                        title: '<%= e.getEventTitle().replace("'", "\\'") %>',
+                        start: '<%= e.getEventDate().toString() %>',
+                        backgroundColor: '<%= "Waiting".equalsIgnoreCase(e.getStatus()) ? "#FFD700" : "#4D2B8C" %>',
+                        borderColor: 'transparent'
+                    }<%= (i < allMyEvents.size() - 1) ? "," : "" %>
+                    <% } %>
+                ],
+                eventClick: function(info) { window.location.href = "event-details.jsp?id=" + info.event.id; }
+            });
+            calendar.render();
+        });
+    </script>
+</body>
 </html>

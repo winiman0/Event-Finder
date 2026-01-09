@@ -1,6 +1,7 @@
 package com.event.dao;
 
 import com.event.model.Event;
+
 import com.event.util.DBConnection;
 import java.sql.*;
 import java.util.ArrayList;
@@ -9,15 +10,17 @@ import java.util.List;
 public class EventDAO {
 
     // 1. Fetch ALL Events (Admin view - sorted by date)
-    public List<Event> getAllEvents() {
+        public List<Event> getAllEvents() {
         List<Event> events = new ArrayList<>();
-        // Removed the "Upcoming" filter so Admin can see everything
-        String sql = "SELECT * FROM EVENT ORDER BY EventDate ASC";
+        String sql = "SELECT e.*, c.CampusName, o.OrganizerName " +
+                     "FROM EVENT e " +
+                     "LEFT JOIN CAMPUS c ON e.CampusID = c.CampusID " +
+                     "LEFT JOIN ORGANIZER o ON e.OrganizerID = o.OrganizerID " +
+                     "ORDER BY e.EventDate ASC";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 events.add(mapResultSetToEvent(rs));
             }
@@ -30,9 +33,7 @@ public class EventDAO {
     // 2. Fetch Events by Campus
     public List<Event> getEventsByCampus(String campusID) {
         List<Event> events = new ArrayList<>();
-        String sql = "SELECT e.* FROM EVENT e " +
-                     "JOIN ORGANIZER o ON e.OrganizerID = o.OrganizerID " +
-                     "WHERE o.CampusID = ?";
+        String sql = "SELECT * FROM EVENT WHERE CampusID = ? ORDER BY EventDate ASC";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -50,7 +51,7 @@ public class EventDAO {
 
     // 3. Admin: Add New Event
     public int addEvent(Event event) { // Changed return type from boolean to int
-            String sql = "INSERT INTO EVENT (OrganizerID, CampusID, EventTitle, Description, EventType, EventVenue, EventDate, StartTime, EndTime, ImageURL, Status, MeritPoints, MaxCapacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO EVENT (OrganizerID, CampusID, EventTitle, Description, EventType, EventVenue, EventDate, StartTime, EndTime, ImageURL, Status, MeritPoints, MaxCapacity) VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             // Notice the Statement.RETURN_GENERATED_KEYS flag
             try (Connection conn = DBConnection.getConnection();
@@ -82,26 +83,34 @@ public class EventDAO {
             return -1; // failure
         }
 
-    // 2. Updated Helper to include MaxCapacity
-    private Event mapResultSetToEvent(ResultSet rs) throws SQLException {
-        Event e = new Event();
-        e.setEventID(rs.getInt("EventID"));
-        e.setOrganizerID(rs.getInt("OrganizerID"));
-        e.setCampusID(rs.getString("CampusID"));
-        try { e.setCampusName(rs.getString("CampusName")); } catch (SQLException ex) {}
-        e.setEventTitle(rs.getString("EventTitle"));
-        e.setDescription(rs.getString("Description"));
-        e.setEventType(rs.getString("EventType"));
-        e.setEventVenue(rs.getString("EventVenue"));
-        e.setEventDate(rs.getDate("EventDate"));
-        e.setStartTime(rs.getTime("StartTime"));
-        e.setEndTime(rs.getTime("EndTime"));
-        e.setStatus(rs.getString("Status"));
-        e.setImageURL(rs.getString("ImageURL"));
-        e.setMeritPoints(rs.getInt("MeritPoints"));
-        e.setMaxCapacity(rs.getInt("MaxCapacity")); // ADDED
-        return e;
-    }
+    // 2. 
+        private Event mapResultSetToEvent(ResultSet rs) throws SQLException {
+            Event e = new Event();
+            e.setEventID(rs.getInt("EventID"));
+            e.setOrganizerID(rs.getInt("OrganizerID"));
+            e.setCampusID(rs.getString("CampusID"));
+
+            // Read the Joined Names
+            try { 
+                e.setCampusName(rs.getString("CampusName")); 
+                e.setOrganizerName(rs.getString("OrganizerName")); 
+            } catch (SQLException ex) {
+                // Fallback if the names weren't in the query
+            }
+
+            e.setEventTitle(rs.getString("EventTitle"));
+            e.setDescription(rs.getString("Description"));
+            e.setEventType(rs.getString("EventType"));
+            e.setEventVenue(rs.getString("EventVenue"));
+            e.setEventDate(rs.getDate("EventDate"));
+            e.setStartTime(rs.getTime("StartTime"));
+            e.setEndTime(rs.getTime("EndTime"));
+            e.setStatus(rs.getString("Status"));
+            e.setImageURL(rs.getString("ImageURL"));
+            e.setMeritPoints(rs.getInt("MeritPoints"));
+            e.setMaxCapacity(rs.getInt("MaxCapacity"));
+            return e;
+        }
     
     // Fixed getCount logic
     public int getCount(String tableName) {
@@ -156,7 +165,13 @@ public class EventDAO {
     
     // 4. Fetch a single event for Editing
     public Event getEventById(int id) {
-        String sql = "SELECT * FROM EVENT WHERE EventID = ?";
+        // We select everything from event (e.*) plus the specific names from joined tables
+        String sql = "SELECT e.*, c.CampusName, o.OrganizerName " +
+                     "FROM EVENT e " +
+                     "LEFT JOIN CAMPUS c ON e.CampusID = c.CampusID " +
+                     "LEFT JOIN ORGANIZER o ON e.OrganizerID = o.OrganizerID " +
+                     "WHERE e.EventID = ?";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
@@ -235,18 +250,30 @@ public class EventDAO {
     
     public Event getClosestEvent() {
         Event event = null;
-        String sql = "SELECT * FROM EVENT WHERE EventDate >= CURDATE() ORDER BY EventDate ASC, StartTime ASC LIMIT 1";
+        
+        String sql =     
+                "SELECT e.*, c.CampusName, o.OrganizerName " +
+                "FROM EVENT e " +
+                "LEFT JOIN CAMPUS c ON e.CampusID = c.CampusID " +
+                "LEFT JOIN ORGANIZER o ON e.OrganizerID = o.OrganizerID " +
+                "WHERE e.EventDate >= CURRENT_DATE " +
+                "ORDER BY e.EventDate ASC " +
+                "FETCH FIRST 1 ROW ONLY";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 event = mapResultSetToEvent(rs);
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { 
+            System.out.println("DAO ERROR: " + e.getMessage());
+            e.printStackTrace(); 
+        }
         return event;
     }
     
-    public List<String[]> getAllCampuses() {
+    public List<String[]> getAllCampusesList() {
         List<String[]> list = new ArrayList<>();
         String sql = "SELECT CampusID, CampusName FROM CAMPUS ORDER BY CampusName ASC";
         try (Connection conn = DBConnection.getConnection();
@@ -257,5 +284,22 @@ public class EventDAO {
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
+    }
+    
+   
+    public boolean updateEventStatus(int eventId, String status) {
+        
+        String sql = "UPDATE EVENT SET Status = ? WHERE EventID = ?"; 
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, status);
+            ps.setInt(2, eventId);
+
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

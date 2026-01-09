@@ -13,20 +13,35 @@
     request.setAttribute("activePage", "home");
     EventDAO eventDao = new EventDAO();
     
-    // 1. Get the closest upcoming event for the Counter and Banner
+    // 1. Get All Events first (for the carousel/pictures)
+    List<Event> allEvents = eventDao.getAllEvents();
+    if(allEvents == null) allEvents = new ArrayList<>(); // Prevent null pointer
+    
+    // 2. Get the closest event for the counter
     Event closestEvent = eventDao.getClosestEvent(); 
     
-    // 2. Get all events - CHANGED NAME TO allEvents TO MATCH YOUR LOOPS
-    List<Event> allEvents = eventDao.getAllEvents();
+    // 3. Set nextEvent logic
+    Event nextEvent = (!allEvents.isEmpty()) ? allEvents.get(0) : null;
     
-    // 3. Set the nextEvent using the list we just fetched
-    Event nextEvent = (allEvents != null && !allEvents.isEmpty()) ? allEvents.get(0) : null;
-    
-    // 4. Handle the target date for the counter
-    String targetDate = "Dec 31, 2026 23:59:59"; // Default fallback
-    if (closestEvent != null) {
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm:ss");
-        targetDate = sdf.format(closestEvent.getEventDate()) + " " + closestEvent.getStartTime();
+    // 4. Calculate targetMillis safely
+    long targetMillis = 0;
+    if (closestEvent != null && closestEvent.getEventDate() != null) {
+        try {
+            // We use the Date + Time from the object
+            java.sql.Date d = closestEvent.getEventDate();
+            java.sql.Time t = closestEvent.getStartTime();
+            
+            if (t != null) {
+                // Combine date and time into one timestamp
+                String combined = d.toString() + " " + t.toString();
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                targetMillis = sdf.parse(combined).getTime();
+            } else {
+                targetMillis = d.getTime();
+            }
+        } catch (Exception e) {
+            targetMillis = 0;
+        }
     }
 %>
 <!DOCTYPE html>
@@ -57,10 +72,10 @@
     <div class="main-banner">
         <div class="counter-content">
             <ul>
-                <li>Days<span id="days"></span></li>
-                <li>Hours<span id="hours"></span></li>
-                <li>Minutes<span id="minutes"></span></li>
-                <li>Seconds<span id="seconds"></span></li>
+                <li>Days<span id="timer-days"></span></li>
+                <li>Hours<span id="timer-hours"></span></li>
+                <li>Minutes<span id="timer-minutes"></span></li>
+                <li>Seconds<span id="timer-seconds"></span></li>
             </ul>
         </div>
         <div class="container">
@@ -95,7 +110,9 @@
                             for(Event e : allEvents) { %>
                             <div class="item">
                                 <a href="event-details.jsp?id=<%= e.getEventID() %>">
-                                    <img src="assets/images/events/<%= e.getImageURL() %>" alt="<%= e.getEventTitle() %>" style="height: 350px; object-fit: cover;">
+                                    <img src="${pageContext.request.contextPath}/getImage?name=<%= e.getImageURL() %>" 
+                                                alt="Event Image" 
+                                                style="width:100%; height:250px; object-fit:cover;">
                                 </a>
                             </div>
                         <% } } %>
@@ -113,7 +130,7 @@
                         <h4>Discover Events Across UiTM Campuses</h4>
                         <p>Digitific is your central hub for all campus activities. From <strong>UiTM Shah Alam</strong> to <strong>UiTM Dungun</strong>, we bring every club, society, and organization event to your fingertips. 
                         <br><br>
-                        Earn merit points, build your network, and never miss out on the action again. Check out the latest in <a href="shows-events.jsp">Shows & Events</a>.</p>
+                        Earn merit points, build your network, and never miss out on the action again. Check out the latest in <a href="ad_event.jsp">Shows & Events</a>.</p>
                     </div>
                 </div>
             </div>
@@ -138,7 +155,9 @@
                     <div class="event-item">
                         <div class="thumb">
                             <a href="event-details.jsp?id=<%= e.getEventID() %>">
-                                <img src="assets/images/events/<%= e.getImageURL() %>" alt="<%= e.getEventTitle() %>" style="height: 250px; object-fit: cover;">
+                                <img src="getImage?name=<%= e.getImageURL() %>" 
+                                     alt="<%= e.getEventTitle() %>" 
+                                     style="height: 350px; object-fit: cover;">
                             </a>
                         </div>
                         <div class="down-content">
@@ -155,26 +174,43 @@
         </div>
     </div>
 
+   <!-- *** Footer *** -->
     <footer>
         <div class="container">
             <div class="row">
                 <div class="col-lg-12">
+                    <div class="under-footer">
+                        <div class="rowFooter">
+                            <div class="col-lg-6 col-sm-6 ms-auto text-end">
+                                <p class="copyright">Copyright 2025 Digitific Company 
+                    
+                    			<br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-12">
                     <div class="sub-footer">
                         <div class="row">
+                            <div class="col-lg-3">
+                                <div class="logo"><span><em>Digitific</em></span></div>
+                            </div>
                             <div class="col-lg-6">
                                 <div class="menu">
                                     <ul>
                                         <li><a href="index.jsp" class="active">Home</a></li>
-                                        <li><a href="shows-events.jsp">Shows & Events</a></li> 
+                                        <li><a href="ad_event.jsp">Shows & Events</a></li> 
                                     </ul>
                                 </div>
                             </div>
+                           
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </footer>
+
 
      <!-- jQuery -->
     <script src="assets/js/jquery-2.1.0.min.js"></script>
@@ -194,29 +230,55 @@
     
     <!-- Global Init -->
     <script src="assets/js/custom.js"></script>
+    
+    <script>
+        // Force preloader off after 2 seconds no matter what
+        setTimeout(function(){
+            document.getElementById('js-preloader').classList.add('loaded');
+        }, 2000);
+    </script>
+    <script>
+        var countToTimestamp = <%= targetMillis %>;
+        console.log("Target Event Timestamp:", countToTimestamp); // Debugging line
 
-        <script>
-            // Overriding the hardcoded date from custom.js
-            var eventTargetDate = "<%= targetDate %>";
-
-            function updateCounter() {
-                var countTo = new Date(eventTargetDate).getTime();
-                var now = new Date().getTime();
-                var diff = countTo - now;
-
-                if (diff < 0) return; // Event has passed
-
-                var d = Math.floor(diff / (1000 * 60 * 60 * 24));
-                var h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                var m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                var s = Math.floor((diff % (1000 * 60)) / 1000);
-
-                document.getElementById("days").innerHTML = d;
-                document.getElementById("hours").innerHTML = h;
-                document.getElementById("minutes").innerHTML = m;
-                document.getElementById("seconds").innerHTML = s;
+        function updateCounter() {
+            if (countToTimestamp === 0) {
+                setCounterValues(0, 0, 0, 0);
+                return;
             }
-            setInterval(updateCounter, 1000);
-        </script>
+
+            var now = new Date().getTime();
+            var diff = countToTimestamp - now;
+
+            if (diff <= 0) {
+                setCounterValues(0, 0, 0, 0);
+                return;
+            }
+
+            var d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            var h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            var m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            var s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            setCounterValues(d, h, m, s);
+        }
+
+        function setCounterValues(d, h, m, s) {
+            
+            var dEl = document.getElementById("timer-days");
+            var hEl = document.getElementById("timer-hours");
+            var mEl = document.getElementById("timer-minutes");
+            var sEl = document.getElementById("timer-seconds");
+
+            if(dEl) dEl.innerText = d;
+            if(hEl) hEl.innerText = h;
+            if(mEl) mEl.innerText = m;
+            if(sEl) sEl.innerText = s;
+        }
+        // This clear interval trick helps stop some flickering if the 
+        // template's custom.js is poorly written
+        var counterInterval = setInterval(updateCounter, 1000);
+        updateCounter();
+    </script>
     </body>
 </html>

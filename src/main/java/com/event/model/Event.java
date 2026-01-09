@@ -20,6 +20,7 @@ public class Event implements Serializable {
     private int maxCapacity;
     private String campusID;
     private String campusName;
+    private String organizerName;
 
     public Event() {}
 
@@ -68,4 +69,7 @@ public class Event implements Serializable {
 
     public String getCampusName() { return campusName; }
     public void setCampusName(String campusName) { this.campusName = campusName; }
+
+    public String getOrganizerName() { return organizerName; }
+    public void setOrganizerName(String organizerName) { this.organizerName = organizerName; }
 }

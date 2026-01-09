@@ -2,7 +2,6 @@ package com.event.model;
 
 import java.io.Serializable;
 
-// This is a JavaBean. It must be Serializable and have a no-arg constructor.
 public class User implements Serializable {
     private String userID;
     private String fullName;

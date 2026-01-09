@@ -1,29 +1,37 @@
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
-<%@page import="com.event.model.Event, com.event.dao.EventDAO, com.event.model.User"%>
+<%@page import="com.event.model.Event, com.event.dao.EventDAO, com.event.model.User, java.util.List"%>
 <%
-    // 1. Security Check (Reuse your admin check)
+    // 1. Security Check
     User admin = (User) session.getAttribute("user");
     if (admin == null || !"admin".equalsIgnoreCase(admin.getRole())) {
         response.sendRedirect("login.jsp");
         return;
     }
 
-    // 2. Check for ID to determine mode
+    EventDAO dao = new EventDAO();
+    
+    // 2. Determine if we are Editing or Adding
     String idParam = request.getParameter("id");
     Event event = null;
     boolean isEdit = false;
 
     if (idParam != null && !idParam.isEmpty()) {
-        EventDAO dao = new EventDAO();
         event = dao.getEventById(Integer.parseInt(idParam));
         if (event != null) {
             isEdit = true;
         }
     }
-%>
-<%
-    String currentImage = (isEdit && event.getImageURL() != null) ? event.getImageURL() : "placeholder.png";
-    String imagePath = "assets/images/events/" + currentImage;
+
+    // 3. Set up the Image Path 
+    String displayImagePath;
+    if (isEdit && event.getImageURL() != null && !event.getImageURL().isEmpty()) {
+        // FIX: Use the servlet for uploaded (external) images
+        displayImagePath = "getImage?name=" + event.getImageURL();
+    } else {
+        // This stays the same because it's a static file inside your project
+        displayImagePath = "assets/images/empty_image.png";
+    }
+    
     request.setAttribute("activePage", "events");
 %>
 <%@ include file="header.jsp" %>
@@ -142,11 +150,15 @@
         <div class="row">
             <div class="col-lg-4">
                 <div class="left-upload">
-                    <img src="<%= (imagePath != null && !imagePath.isEmpty()) ? imagePath : "assets/images/empty_image.jpg" %>" alt="Event Image" id="preview">
+                    <img src="${pageContext.request.contextPath}/<%= displayImagePath %>" 
+                         alt="Event Image" id="preview" style="width:200px; height:auto;">
+
                     <div class="form-group">
                         <label for="eventImage">Upload Event Poster</label>
                         <input type="file" id="eventImage" name="eventImage" class="form-control" accept="image/*" onchange="previewImage(event)">
-                        <input type="hidden" name="existingImage" value="<%= isEdit ? event.getImageURL() : "placeholder.png" %>">
+
+                        <input type="hidden" name="existingImage" value="<%= isEdit ? event.getImageURL() : "" %>">
+
                         <small class="text-muted">Keep empty to retain current image</small>
                     </div>
                 </div>
@@ -206,6 +218,7 @@
                         <option value="Upcoming" <%= (isEdit && "Upcoming".equals(event.getStatus())) ? "selected" : "" %>>Upcoming</option>
                         <option value="Ongoing" <%= (isEdit && "Ongoing".equals(event.getStatus())) ? "selected" : "" %>>Ongoing</option>
                         <option value="Completed" <%= (isEdit && "Completed".equals(event.getStatus())) ? "selected" : "" %>>Completed</option>
+                        <option value="Cancelled" <%= (isEdit && "Cancelled".equals(event.getStatus())) ? "selected" : "" %>>Cancelled</option>
                     </select>
                 </div>
                 <div class="row">
@@ -214,14 +227,11 @@
                         <select name="campusID" class="form-control" required>
                             <option value="">-- Select Campus --</option>
                             <% 
-                                // This method should return List<String[]> where index 0 is ID and 1 is Name
                                 for (String[] camp : dao.getAllCampusesList()) { 
-                                    // String comparison using .equals()
                                     boolean isSelected = isEdit && camp[0].equals(event.getCampusID());
                             %>
                                 <option value="<%= camp[0] %>" <%= isSelected ? "selected" : "" %>>
-                                    <%= camp[1] %> (<%= camp[0] %>)
-                                </option>
+                                    <%= camp[1] %> </option>
                             <% } %>
                         </select>
                     </div>
@@ -230,8 +240,8 @@
                         <select name="organizerID" class="form-control" required>
                             <option value="">-- Select Organizer --</option>
                             <% 
-                                EventDAO dao = new EventDAO();
                                 for (String[] org : dao.getAllOrganizers()) { 
+                                    // Since OrganizerID is an int, we parse the string ID from the list
                                     boolean isSelected = isEdit && Integer.parseInt(org[0]) == event.getOrganizerID();
                             %>
                                 <option value="<%= org[0] %>" <%= isSelected ? "selected" : "" %>>
@@ -245,7 +255,7 @@
                             <label>Event Format</label>
                             <select name="eventType" class="form-control" required>
                                 <% 
-                                    String[] formats = {"Arts/Performance", "Ceremony", "Club Activity", "Competition", "Entrepreneurship", "Meeting", "Sports (Competitive)", "Sports (Recreational)", "Talk", "Trip", "Volunteering", "Workshop"};
+                                    String[] formats = {"Club Activity", "Gathering", "Workshop", "Talk", "Volunteering", "Meeting", "Competition (General)", "Trip", "Ceremony", "Entrepreneurship", "Arts/Performance", "Seminar", "Sports (Competitive)", "Sports (Recreational)", "Exhibition"};
                                     for (String f : formats) {
                                 %>
                                     <option value="<%= f %>" <%= (isEdit && f.equals(event.getEventType())) ? "selected" : "" %>><%= f %></option>
