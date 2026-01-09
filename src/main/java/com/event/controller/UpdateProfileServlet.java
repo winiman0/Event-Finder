@@ -41,9 +41,10 @@ public class UpdateProfileServlet extends HttpServlet {
         boolean updated = dao.updateProfile(currentUser);
 
         if (updated) {
-            // Refresh the session with the updated object so the UI reflects changes
-            session.setAttribute("user", currentUser);
+            User freshUser = dao.getUserByID(currentUser.getUserID());
+            session.setAttribute("user", freshUser); 
             response.sendRedirect("profile.jsp?status=success");
+        
         } else {
             response.sendRedirect("profile.jsp?status=error");
         }

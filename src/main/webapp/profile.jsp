@@ -75,13 +75,22 @@
 </head>
 
 <body>
+    
     <div class="page-heading-shows-events">
         <div class="container">
             <h2>Account Profile</h2>
             <span>Official student record and achievement tracking.</span>
         </div>
     </div>
+    
+    <% if ("success".equals(request.getParameter("status"))) { %>
+        <div class="alert alert-success alert-dismissible fade show container mt-3" role="alert">
+            <strong>Success!</strong> Your profile has been updated.
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+        </div>
+    <% } %>
 
+    
     <div class="container mt-5 mb-5">
         <div class="row">
             <div class="col-lg-4">
@@ -119,11 +128,15 @@
                         </div>
                         <div class="col-md-6">
                             <label class="info-label">Contact Number</label>
-                            <p class="info-value"><%= (user.getPhoneNumber() != null) ? user.getPhoneNumber() : "---" %></p>
+                            <p class="info-value">
+                                <%= (user.getPhoneNumber() != null && !user.getPhoneNumber().trim().isEmpty()) ? user.getPhoneNumber() : "---" %>
+                            </p>
                         </div>
                         <div class="col-md-6">
                             <label class="info-label">Faculty</label>
-                            <p class="info-value"><%= (user.getFaculty() != null) ? user.getFaculty() : "Not Specified" %></p>
+                            <p class="info-value">
+                                <%= (user.getFaculty() != null && !user.getFaculty().trim().isEmpty()) ? user.getFaculty() : "Not Specified" %>
+                            </p>
                         </div>
                         <div class="col-md-6">
                             <label class="info-label">Campus</label>
@@ -162,6 +175,10 @@
                         <div class="form-group">
                             <label>Faculty</label>
                             <select name="faculty" class="form-control">
+                                <option value="" <%= (user.getFaculty() == null || user.getFaculty().trim().isEmpty()) ? "selected" : "" %>>
+                                    -- Not Specified --
+                                </option>
+
                                 <option value="FKSW" <%= "FKSW".equals(user.getFaculty()) ? "selected" : "" %>>FKSW - Computer Science</option>
                                 <option value="FKP" <%= "FKP".equals(user.getFaculty()) ? "selected" : "" %>>FKP - Management</option>
                                 <option value="FKE" <%= "FKE".equals(user.getFaculty()) ? "selected" : "" %>>FKE - Engineering</option>

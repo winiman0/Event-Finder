@@ -125,12 +125,11 @@ public class RegistrationDAO {
     
    public List<Event> getEventsByUser(String userId, boolean isUpcoming) {
     List<Event> events = new ArrayList<>();
-    // DERBY FIX: Use CURRENT_DATE instead of CURDATE()
-    String sql = "SELECT e.*, r.Status as UserRegStatus FROM EVENT e " +
+    String sql = "SELECT e.*, e.Status as GlobalEventStatus, r.Status as UserRegStatus " +
+                 "FROM EVENT e " +
                  "JOIN REGISTRATION r ON e.EventID = r.EventID " +
                  "WHERE r.UserID = ? AND " + 
                  (isUpcoming ? "e.EventDate >= CURRENT_DATE" : "e.EventDate < CURRENT_DATE");
-
     try (Connection conn = DBConnection.getConnection();
          PreparedStatement ps = conn.prepareStatement(sql)) {
         ps.setString(1, userId);
@@ -172,37 +171,41 @@ public class RegistrationDAO {
     }
     
     private Event mapResultSetToEvent(ResultSet rs) throws SQLException {
-    Event e = new Event();
-    e.setEventID(rs.getInt("EventID"));
-    e.setOrganizerID(rs.getInt("OrganizerID"));
-    e.setEventTitle(rs.getString("EventTitle"));
-    e.setDescription(rs.getString("Description"));
-    e.setEventType(rs.getString("EventType"));
-    e.setEventVenue(rs.getString("EventVenue"));
-    e.setEventDate(rs.getDate("EventDate"));
-    e.setStartTime(rs.getTime("StartTime"));
-    e.setEndTime(rs.getTime("EndTime"));
-    e.setImageURL(rs.getString("ImageURL"));
-    e.setMeritPoints(rs.getInt("MeritPoints"));
-    e.setMaxCapacity(rs.getInt("MaxCapacity"));
+        Event e = new Event();
+        e.setEventID(rs.getInt("EventID"));
+        e.setOrganizerID(rs.getInt("OrganizerID"));
+        e.setEventTitle(rs.getString("EventTitle"));
+        e.setDescription(rs.getString("Description"));
+        e.setEventType(rs.getString("EventType"));
+        e.setEventVenue(rs.getString("EventVenue"));
+        e.setEventDate(rs.getDate("EventDate"));
+        e.setStartTime(rs.getTime("StartTime"));
+        e.setEndTime(rs.getTime("EndTime"));
+        e.setImageURL(rs.getString("ImageURL"));
+        e.setMeritPoints(rs.getInt("MeritPoints"));
+        e.setMaxCapacity(rs.getInt("MaxCapacity"));
 
-    // FIX: Try to get status from the alias first, then the default column
-    String status = null;
-    try {
-        // This is what we use in joined queries (UserRegStatus)
-        status = rs.getString("UserRegStatus");
-    } catch (SQLException ex) {
+        String userStatus = null;
+        String globalStatus = null;
+
         try {
-            // This is the fallback for simple queries (Status)
-            status = rs.getString("Status");
-        } catch (SQLException ex2) {
-            status = "Unknown"; 
+            globalStatus = rs.getString("GlobalEventStatus");
+            userStatus = rs.getString("UserRegStatus");
+        } catch (SQLException ex) {
+            // Fallback if columns aren't in this specific result set
+            userStatus = rs.getString("Status"); 
         }
+
+        // LOGIC: If the Event is cancelled, the status is Cancelled.
+        // Otherwise, use the user's specific status (Confirmed/Waiting).
+        if ("Cancelled".equalsIgnoreCase(globalStatus)) {
+            e.setStatus("Cancelled");
+        } else {
+            e.setStatus(userStatus);
+        }
+
+        return e;
     }
-    e.setStatus(status);
-    
-    return e;
-}
     
     public String getUserRegistrationStatus(String userId, int eventId) {
         String sql = "SELECT Status FROM REGISTRATION WHERE UserID = ? AND EventID = ?";

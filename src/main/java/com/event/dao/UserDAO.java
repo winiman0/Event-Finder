@@ -13,13 +13,10 @@ public class UserDAO {
     public User authenticateUser(String email, String password) {
         User user = null;
         String sql = "SELECT * FROM USERS WHERE Email = ? AND Password = ?";
-
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setString(1, email);
             ps.setString(2, password);
-
             ResultSet rs = ps.executeQuery();
 
             if (rs.next()) {
@@ -29,11 +26,14 @@ public class UserDAO {
                 user.setEmail(rs.getString("Email"));
                 user.setRole(rs.getString("Role"));
                 user.setCampusID(rs.getString("CampusID"));
+
+                // FIX: You were missing these! 
+                // Without these, the session object is empty on login
+                user.setPhoneNumber(rs.getString("Phone")); 
+                user.setFaculty(rs.getString("Faculty"));
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return user; // Returns a User object if found, or null if login fails
+        } catch (Exception e) { e.printStackTrace(); }
+        return user;
     }
     
         public boolean registerUser(User user) {
@@ -86,15 +86,11 @@ public class UserDAO {
     
     public List<User> getAllUsers() {
         List<User> list = new ArrayList<>();
-        // Use a JOIN to get Name and State from the CAMPUS table
-        String sql = "SELECT u.*, c.CampusName, c.CampusState " +
-                     "FROM USERS u " +
+        String sql = "SELECT u.*, c.CampusName, c.CampusState FROM USERS u " +
                      "LEFT JOIN CAMPUS c ON u.CampusID = c.CampusID";
-
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 User u = new User();
                 u.setUserID(rs.getString("UserID"));
@@ -103,7 +99,7 @@ public class UserDAO {
                 u.setRole(rs.getString("Role"));
                 u.setCampusID(rs.getString("CampusID"));
                 u.setPhoneNumber(rs.getString("Phone")); 
-               
+                u.setFaculty(rs.getString("Faculty")); // Added this too
                 u.setCampusName(rs.getString("CampusName"));
                 u.setCampusState(rs.getString("CampusState"));
                 list.add(u);
@@ -135,39 +131,136 @@ public class UserDAO {
         return success;
     }
     
-    public int getUserTotalMerit(String userID) {
-        int total = 0;
-        // Only count points where an admin has confirmed attendance
-        String sql = "SELECT SUM(e.EventPoints) FROM REGISTRATION r " +
-                     "JOIN EVENT e ON r.EventID = e.EventID " +
-                     "WHERE r.UserID = ? AND r.Status = 'Attended'";
-
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, userID);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                total = rs.getInt(1);
-            }
-        } catch (Exception e) { e.printStackTrace(); }
-        return total;
-    }
     
+public User getUserByID(String userID) {
+    User user = null;
+    // Join with Campus to get full details in one go
+    String sql = "SELECT u.*, c.CampusName, c.CampusState " +
+                 "FROM USERS u " +
+                 "LEFT JOIN CAMPUS c ON u.CampusID = c.CampusID " +
+                 "WHERE u.UserID = ?";
+
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        
+        ps.setString(1, userID);
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()) {
+            user = new User();
+            user.setUserID(rs.getString("UserID"));
+            user.setFullName(rs.getString("FullName"));
+            user.setEmail(rs.getString("Email"));
+            user.setRole(rs.getString("Role"));
+            user.setCampusID(rs.getString("CampusID"));
+            user.setPhoneNumber(rs.getString("Phone"));
+            user.setFaculty(rs.getString("Faculty"));
+            user.setCampusName(rs.getString("CampusName"));
+            user.setCampusState(rs.getString("CampusState"));
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    return user;
+}
+public int getUserTotalMerit(String userID) {
+    int total = 0;
+    
+    String sql = "SELECT SUM(e.MeritPoints) FROM REGISTRATION r " +
+                 "JOIN EVENT e ON r.EventID = e.EventID " +
+                 "WHERE r.UserID = ? AND LOWER(r.Status) = 'attended'";
+
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setString(1, userID);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) {
+            total = rs.getInt(1); 
+        }
+    } catch (Exception e) { 
+        e.printStackTrace(); 
+    }
+    return total;
+}
+
     public List<String[]> getMeritHistory(String userID) {
         List<String[]> history = new ArrayList<>();
-        String sql = "SELECT e.EventName, e.EventPoints FROM REGISTRATION r " +
+        String sql = "SELECT e.EventTitle, e.MeritPoints, r.Status FROM REGISTRATION r " +
                      "JOIN EVENT e ON r.EventID = e.EventID " +
-                     "WHERE r.UserID = ? AND r.Status = 'Attended'";
+                     "WHERE r.USERID = ? AND TRIM(LOWER(r.STATUS)) = 'attended'";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, userID);
             ResultSet rs = ps.executeQuery();
+
+            System.out.println("--- DEBUG: Fetching Merit for " + userID + " ---");
+
             while (rs.next()) {
-                // Store as a pair: {Event Name, Points}
-                history.add(new String[]{rs.getString("EventName"), rs.getString("EventPoints")});
+                String name = rs.getString("EventTitle");
+                String points = rs.getString("MeritPoints");
+                String status = rs.getString("Status");
+
+                System.out.println("Found: " + name + " | Status: [" + status + "] | Points: " + points);
+
+                // Only add to the list if it matches our criteria
+                if ("attended".equalsIgnoreCase(status.trim())) {
+                    history.add(new String[]{name, points});
+                }
             }
+            if (history.isEmpty()) System.out.println("DEBUG: History list is still empty after loop.");
+
         } catch (Exception e) { e.printStackTrace(); }
         return history;
+    }
+    public boolean deleteUser(String userId) {
+        String sql = "DELETE FROM USERS WHERE UserID = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, userId);
+            return ps.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            System.err.println("Error deleting user: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    public boolean updateUserByAdmin(User user) {
+        // Note the order: 1:Name, 2:Email, 3:Phone, 4:Faculty, 5:Role, 6:CampusID, 7:UserID
+        String sql = "UPDATE USERS SET FullName = ?, Email = ?, Phone = ?, Faculty = ?, Role = ?, CampusID = ? WHERE UserID = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, user.getFullName());
+            ps.setString(2, user.getEmail());
+            ps.setString(3, user.getPhoneNumber());
+            ps.setString(4, user.getFaculty());
+            ps.setString(5, user.getRole());
+            ps.setString(6, user.getCampusID()); // This MUST be the ID, not the Name
+            ps.setString(7, user.getUserID());
+
+            int rows = ps.executeUpdate();
+            return rows > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace(); // THIS WILL TELL YOU WHY IT FAILED in the console
+            return false;
+        }
+    }
+    public List<String[]> getAllCampusesForDropdown() {
+        List<String[]> list = new ArrayList<>();
+        String sql = "SELECT CampusID, CampusName FROM CAMPUS";
+        try (Connection conn = com.event.util.DBConnection.getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql);
+             java.sql.ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                // Stores ID at index 0 and Name at index 1
+                list.add(new String[]{rs.getString("CampusID"), rs.getString("CampusName")});
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return list;
     }
 }

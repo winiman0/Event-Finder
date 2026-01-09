@@ -10,11 +10,16 @@
 
     // 2. Fetch Data
     UserDAO userDAO = new UserDAO();
-    List<User> userList = userDAO.getAllUsers(); // Assuming you have this method
+    List<User> userList = userDAO.getAllUsers();
     
-    EventDAO eventDAO = new EventDAO();
-    List<String> allCampuses = eventDAO.getAllCampusesFromTable();
-%>
+    // Fetch from UserDAO instead of EventDAO
+    List<String[]> allCampuses = userDAO.getAllCampusesForDropdown();
+    
+    request.setAttribute("activePage", "users");
+    
+    
+    %>
+    <%@ include file="header.jsp" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -93,20 +98,7 @@
       </div>
     </div>
     <!-- ***** Preloader End ***** -->
-        
-    <header class="header-area header-sticky">
-        <div class="container">
-            <nav class="main-nav">
-                <a href="admin_dashboard.jsp" class="logo"><em>Digitific</em></a>
-                <ul class="nav">
-                    <li><a href="admin_dashboard.jsp">Dashboard</a></li>
-                    <li><a href="ad_event.jsp">Shows & Events</a></li>
-                    <li><a href="users.jsp" class="active">Users</a></li>
-                    <li><a href="LogoutServlet">Logout</a></li>
-                </ul>        
-            </nav>
-        </div>
-    </header>
+       
 
     <div class="page-heading-shows-events" style="background-image: url('assets/images/shows_eventsbg.jpg');">
         <div class="container">
@@ -118,7 +110,22 @@
             </div>
         </div>
     </div>
-
+    <%
+        String msg = request.getParameter("msg");
+        if(msg != null) {
+            String alertClass = msg.equals("error") ? "alert-danger" : "alert-success";
+            String messageText = "";
+            if(msg.equals("updated")) messageText = "User updated successfully!";
+            if(msg.equals("deleted")) messageText = "User removed successfully!";
+            if(msg.equals("error")) messageText = "An error occurred. Please try again.";
+    %>
+        <div class="alert <%= alertClass %> alert-dismissible fade show" role="alert">
+            <strong>Status:</strong> <%= messageText %>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    <% } %>
     <div class="main-content-wrapper">
         <div class="container">
             <div class="row">
@@ -133,10 +140,14 @@
                                 <input class="form-check-input campus-filter" type="checkbox" value="all" id="allCamp" checked>
                                 <label class="form-check-label" for="allCamp">All Campuses</label>
                             </div>
-                            <% for(String campus : allCampuses) { %>
+                            <% for(String[] campus : allCampuses) { %>
                                 <div class="form-check mb-1">
-                                    <input class="form-check-input campus-filter" type="checkbox" value="<%= campus %>" id="u_<%= campus %>">
-                                    <label class="form-check-label" for="u_<%= campus %>"><%= campus %></label>
+                                    <%-- Use campus[1] for the Name and campus[0] for the ID --%>
+                                    <input class="form-check-input campus-filter" type="checkbox" 
+                                           value="<%= campus[1] %>" id="u_<%= campus[0] %>">
+                                    <label class="form-check-label" for="u_<%= campus[0] %>">
+                                        <%= campus[1] %>
+                                    </label>
                                 </div>
                             <% } %>
                         </div>
@@ -171,8 +182,20 @@
                                             <small class="text-info"><%= u.getCampusState() %></small>
                                         </td>
                                         <td class="text-center">
-                                            <a href="user-edit.jsp?id=<%= u.getUserID() %>" class="btn btn-sm btn-light"><i class="fa fa-pencil"></i></a>
-                                            <button class="btn btn-sm btn-danger" onclick="confirmDelete('<%= u.getUserID() %>')"><i class="fa fa-trash"></i></button>
+                                           <button type="button" class="btn btn-sm btn-light" 
+                                                onclick="openEditModal('<%= u.getUserID() %>', 
+                                                                       '<%= u.getFullName() %>', 
+                                                                       '<%= u.getEmail() %>', 
+                                                                       '<%= u.getPhoneNumber() %>', 
+                                                                       '<%= u.getCampusID() %>',  <%-- Ensure this is the ID --%>
+                                                                       '<%= u.getRole() %>', 
+                                                                       '<%= u.getFaculty() %>')">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" 
+                                                onclick="openDeleteModal('<%= u.getUserID() %>', '<%= u.getFullName() %>')">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 <% } } %>
@@ -185,6 +208,89 @@
             </div>
         </div>
     </div>
+                            
+    <div class="modal fade" id="editUserModal" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content" style="border-radius: 15px;">
+                <div class="modal-header" style="background-color: #c2acac; color: white; border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                    <h5 class="modal-title" id="editUserModalLabel">Edit User Details</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true" style="color: white;">&times;</span>
+                    </button>
+                </div>
+                <form action="UserUpdateServlet" method="POST">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>User ID</label>
+                            <input type="text" name="userId" id="editUserId" class="form-control" readonly style="background-color: #eee;">
+                        </div>
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" name="fullName" id="editFullName" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" id="editEmail" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" name="phone" id="editPhone" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Campus</label>
+                            <select name="campus" id="editCampus" class="form-control">
+                                <% for(String[] c : allCampuses) { %>
+                                    <option value="<%= c[0] %>"><%= c[1] %></option>
+                                <% } %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Faculty</label>
+                            <select name="faculty" id="editFaculty" class="form-control">
+                                <option value="FKSW">FKSW - Computer Science</option>
+                                <option value="FKP">FKP - Management</option>
+                                <option value="FKE">FKE - Engineering</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <select name="role" id="editRole" class="form-control">
+                                <option value="student">Student</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="background-color: #c2acac; border: none;">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+                            
+                            <div class="modal fade" id="deleteUserModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 15px;">
+            <div class="modal-header bg-danger text-white" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="fa fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                <p>Are you sure you want to delete user <br><strong id="deleteUserName"></strong> (#<span id="deleteUserIdDisplay"></span>)?</p>
+                <p class="text-muted small">This action cannot be undone and may remove their event registrations.</p>
+            </div>
+            <div class="modal-footer">
+                <form action="UserDeleteServlet" method="POST">
+                    <input type="hidden" name="userId" id="hiddenDeleteId">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Yes, Delete User</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
     <!-- *** Footer *** -->
     <footer>
         <div class="container">
@@ -347,6 +453,27 @@
         window.onload = function() {
             applyFilters(); 
         };
+        
+        function openEditModal(id, name, email, phone, campusID, role, faculty) {
+            document.getElementById('editUserId').value = id;
+            document.getElementById('editFullName').value = name;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editPhone').value = (phone === 'null' || !phone) ? "" : phone;
+
+            // Set the dropdowns
+            document.getElementById('editCampus').value = campusID; 
+            document.getElementById('editRole').value = role.toLowerCase();
+            document.getElementById('editFaculty').value = faculty; // Make sure 'faculty' matches the <option value> exactly
+
+            $('#editUserModal').modal('show');
+        }
+        
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteUserIdDisplay').innerText = id;
+            document.getElementById('deleteUserName').innerText = name;
+            document.getElementById('hiddenDeleteId').value = id;
+            $('#deleteUserModal').modal('show');
+        }
     </script>
 </body>
 </html>

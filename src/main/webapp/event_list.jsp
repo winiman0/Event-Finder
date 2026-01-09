@@ -12,24 +12,45 @@
     }
 
     RegistrationDAO regDao = new RegistrationDAO();
-    List<Event> upcomingEvents = regDao.getEventsByUser(user.getUserID(), true);
-    List<Event> pastEventsRaw = regDao.getEventsByUser(user.getUserID(), false);
-    List<Event> allWaiting = regDao.getWaitingListByUser(user.getUserID()); 
     
-    List<Event> waitingEvents = new ArrayList<>();
-    List<Event> pastEvents = new ArrayList<>(pastEventsRaw);
+    // 1. Fetch data from DAO
+    List<Event> rawUpcoming = regDao.getEventsByUser(user.getUserID(), true);
+    List<Event> pastEventsRaw = regDao.getEventsByUser(user.getUserID(), false);
+    List<Event> allWaitingRaw = regDao.getWaitingListByUser(user.getUserID()); 
+    
+    // 2. Initialize our clean lists
+    List<Event> upcomingEvents = new ArrayList<>(); // Will hold ONLY Confirmed Future events
+    List<Event> waitingEvents = new ArrayList<>();  // Will hold ONLY Future Waitlisted events
+    List<Event> pastEvents = new ArrayList<>(pastEventsRaw); // Start with confirmed past events
+    
     java.time.LocalDate today = java.time.LocalDate.now();
     
-    for(Event e : allWaiting) {
+    // 3. Filter the 'Upcoming' list to only include Confirmed ones
+    // This prevents "Waiting" events from showing up in the "Confirmed" section
+    for(Event e : rawUpcoming) {
+        String status = e.getStatus();
+        // Allow both Confirmed AND Cancelled to pass through to the calendar
+        if("Confirmed".equalsIgnoreCase(status) || "Cancelled".equalsIgnoreCase(status)) {
+            upcomingEvents.add(e);
+        }
+    }
+    
+    // 4. Sort the Waitlist into Future or Past
+    for(Event e : allWaitingRaw) {
         java.time.LocalDate eventDate = e.getEventDate().toLocalDate(); 
-        if(eventDate.isBefore(today)) { pastEvents.add(e); } 
-        else { waitingEvents.add(e); }
+        if(eventDate.isBefore(today)) { 
+            pastEvents.add(e); 
+        } else { 
+            waitingEvents.add(e); 
+        }
     }
 
+    // 5. Update Counters
     int upcomingCount = upcomingEvents.size();
     int waitingCount = waitingEvents.size();
     int totalJoined = upcomingCount + pastEvents.size();
 
+    // 6. Combine for Calendar (No duplicates now!)
     List<Event> allMyEvents = new ArrayList<>();
     allMyEvents.addAll(upcomingEvents);
     allMyEvents.addAll(pastEvents);
@@ -118,6 +139,11 @@
             text-align: center;
             font-size: 13px;
         }
+        /* Makes the text in cancelled calendar events have a strikethrough */
+.event-cancelled .fc-event-title {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
         .badge-neon { background: #DDFF7F; color: #2D1B4E; font-size: 10px; padding: 4px 10px; border-radius: 10px; font-weight: 700; }
     </style>
 </head>
@@ -134,6 +160,7 @@
         <div class="row g-4">
             <div class="col-lg-8">
                 <div class="glass-panel">
+                   
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2 style="color: white; font-weight: 800; margin:0;">Event Calendar</h2>
                         <span class="badge-neon">LIVE VIEW</span>
@@ -170,14 +197,18 @@
                         <div class="list-section" id="upcoming-section">
                             <% if(upcomingEvents.isEmpty()) { %>
                                 <div class="empty-state">No upcoming events found.</div>
-                            <% } else { for(Event e : upcomingEvents) { %>
+                            <% } else { for(Event e : upcomingEvents) { 
+                                String status = e.getStatus();
+                                String badgeClass = "badge-success";
+                                if("Cancelled".equalsIgnoreCase(status)) badgeClass = "badge-danger";
+                            %>
                                 <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <h5><%= e.getEventTitle() %></h5>
                                             <p><i class="fa fa-calendar"></i> <%= e.getEventDate() %></p>
                                         </div>
-                                        <span class="badge badge-success" style="font-size: 9px;">Confirmed</span>
+                                        <span class="badge <%= badgeClass %>" style="font-size: 9px;"><%= status %></span>
                                     </div>
                                 </a>
                             <% } } %>
@@ -219,7 +250,7 @@
             </div>
         </div>
     </div>
-<!-- *** Footer *** -->
+
     <footer>
         <div class="container">
             <div class="row">
@@ -228,8 +259,7 @@
                         <div class="rowFooter">
                             <div class="col-lg-6 col-sm-6 ms-auto text-end">
                                 <p class="copyright">Copyright 2025 Digitific Company 
-                    
-                    			<br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
+                                <br>Design: <a rel="nofollow" href="https://www.tooplate.com" target="_parent">Tooplate</a></p>
                             </div>
                         </div>
                     </div>
@@ -248,7 +278,6 @@
                                     </ul>
                                 </div>
                             </div>
-                           
                         </div>
                     </div>
                 </div>
@@ -286,13 +315,28 @@
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
                 events: [
                     <% for(int i = 0; i < allMyEvents.size(); i++) { 
-                        Event e = allMyEvents.get(i); %>
+                        Event e = allMyEvents.get(i);
+                        // .trim() handles hidden spaces, .toUpperCase() handles casing
+                        String status = (e.getStatus() != null) ? e.getStatus().trim().toUpperCase() : "";
+
+                        String bgColor = "#4D2B8C"; // Default Purple
+                        String titlePrefix = "";
+                        
+                        if (status.equals("CANCELLED")) {
+                            bgColor = "#D3D3D3"; // Grey
+                            titlePrefix = "🚫 ";
+                        } else if (status.equals("WAITING")) {
+                            bgColor = "#FFD700"; // Gold
+                        }
+                    %>
                     {
                         id: '<%= e.getEventID() %>',
-                        title: '<%= e.getEventTitle().replace("'", "\\'") %>',
-                        start: '<%= e.getEventDate().toString() %>',
-                        backgroundColor: '<%= "Waiting".equalsIgnoreCase(e.getStatus()) ? "#FFD700" : "#4D2B8C" %>',
-                        borderColor: 'transparent'
+                        title: '<%= titlePrefix + e.getEventTitle().replace("'", "\\'") %>',
+                        start: '<%= e.getEventDate() %>',
+                        backgroundColor: '<%= bgColor %>',
+                        borderColor: 'transparent',
+                        textColor: '<%= status.equals("CANCELLED") ? "#666666" : "#FFFFFF" %>',
+                        classNames: ['<%= status.equals("CANCELLED") ? "event-cancelled" : "" %>']
                     }<%= (i < allMyEvents.size() - 1) ? "," : "" %>
                     <% } %>
                 ],
