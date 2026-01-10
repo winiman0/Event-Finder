@@ -302,4 +302,19 @@ public class EventDAO {
             return false;
         }
     }
+    
+    public void syncEventStatuses() {
+        String sql = "UPDATE EVENT SET status = 'Completed' " +
+                     "WHERE status = 'Upcoming' " +
+                     "AND (eventDate < CURRENT_DATE OR (eventDate = CURRENT_DATE AND endTime < CURRENT_TIME))";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            int rowsUpdated = ps.executeUpdate(); 
+            System.out.println("Background Sync: " + rowsUpdated + " events moved to Completed.");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 }
