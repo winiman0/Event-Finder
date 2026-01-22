@@ -6,7 +6,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class UserDAO {
 
@@ -132,84 +134,113 @@ public class UserDAO {
     }
     
     
-public User getUserByID(String userID) {
-    User user = null;
-    // Join with Campus to get full details in one go
-    String sql = "SELECT u.*, c.CampusName, c.CampusState " +
-                 "FROM USERS u " +
-                 "LEFT JOIN CAMPUS c ON u.CampusID = c.CampusID " +
-                 "WHERE u.UserID = ?";
+    public User getUserByID(String userID) {
+        User user = null;
+        // Join with Campus to get full details in one go
+        String sql = "SELECT u.*, c.CampusName, c.CampusState " +
+                     "FROM USERS u " +
+                     "LEFT JOIN CAMPUS c ON u.CampusID = c.CampusID " +
+                     "WHERE u.UserID = ?";
 
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        
-        ps.setString(1, userID);
-        ResultSet rs = ps.executeQuery();
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-        if (rs.next()) {
-            user = new User();
-            user.setUserID(rs.getString("UserID"));
-            user.setFullName(rs.getString("FullName"));
-            user.setEmail(rs.getString("Email"));
-            user.setRole(rs.getString("Role"));
-            user.setCampusID(rs.getString("CampusID"));
-            user.setPhoneNumber(rs.getString("Phone"));
-            user.setFaculty(rs.getString("Faculty"));
-            user.setCampusName(rs.getString("CampusName"));
-            user.setCampusState(rs.getString("CampusState"));
+            ps.setString(1, userID);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                user = new User();
+                user.setUserID(rs.getString("UserID"));
+                user.setFullName(rs.getString("FullName"));
+                user.setEmail(rs.getString("Email"));
+                user.setRole(rs.getString("Role"));
+                user.setCampusID(rs.getString("CampusID"));
+                user.setPhoneNumber(rs.getString("Phone"));
+                user.setFaculty(rs.getString("Faculty"));
+                user.setCampusName(rs.getString("CampusName"));
+                user.setCampusState(rs.getString("CampusState"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-    } catch (Exception e) {
-        e.printStackTrace();
+        return user;
     }
-    return user;
-}
-public int getUserTotalMerit(String userID) {
-    int total = 0;
-    
-    String sql = "SELECT SUM(e.MeritPoints) FROM REGISTRATION r " +
-                 "JOIN EVENT e ON r.EventID = e.EventID " +
-                 "WHERE r.UserID = ? AND LOWER(r.Status) = 'attended'";
+    public int getUserTotalMerit(String userID) {
+        int total = 0;
 
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        ps.setString(1, userID);
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) {
-            total = rs.getInt(1); 
+        // Calculate Semester Dates
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int month = now.getMonthValue();
+        int year = now.getYear();
+        java.sql.Date startDate, endDate;
+
+        if (month >= 3 && month <= 8) { // March to August
+            startDate = java.sql.Date.valueOf(year + "-03-01");
+            endDate = java.sql.Date.valueOf(year + "-08-31");
+        } else { // September to February (Sem 1 crossover)
+            if (month >= 9) {
+                startDate = java.sql.Date.valueOf(year + "-09-01");
+                endDate = java.sql.Date.valueOf((year + 1) + "-02-28");
+            } else {
+                startDate = java.sql.Date.valueOf((year - 1) + "-09-01");
+                endDate = java.sql.Date.valueOf(year + "-02-28");
+            }
         }
-    } catch (Exception e) { 
-        e.printStackTrace(); 
-    }
-    return total;
-}
 
-    public List<String[]> getMeritHistory(String userID) {
-        List<String[]> history = new ArrayList<>();
-        String sql = "SELECT e.EventTitle, e.MeritPoints, r.Status FROM REGISTRATION r " +
+        String sql = "SELECT SUM(e.MeritPoints) FROM REGISTRATION r " +
                      "JOIN EVENT e ON r.EventID = e.EventID " +
-                     "WHERE r.USERID = ? AND TRIM(LOWER(r.STATUS)) = 'attended'";
+                     "WHERE r.UserID = ? AND LOWER(r.Status) = 'attended' " +
+                     "AND e.EventDate BETWEEN ? AND ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, userID);
+            ps.setDate(2, startDate);
+            ps.setDate(3, endDate);
             ResultSet rs = ps.executeQuery();
-
-            System.out.println("--- DEBUG: Fetching Merit for " + userID + " ---");
-
-            while (rs.next()) {
-                String name = rs.getString("EventTitle");
-                String points = rs.getString("MeritPoints");
-                String status = rs.getString("Status");
-
-                System.out.println("Found: " + name + " | Status: [" + status + "] | Points: " + points);
-
-                // Only add to the list if it matches our criteria
-                if ("attended".equalsIgnoreCase(status.trim())) {
-                    history.add(new String[]{name, points});
-                }
+            if (rs.next()) {
+                total = rs.getInt(1); 
             }
-            if (history.isEmpty()) System.out.println("DEBUG: History list is still empty after loop.");
+        } catch (Exception e) { e.printStackTrace(); }
+        return total;
+    }
 
+    public List<String[]> getMeritHistory(String userID) {
+        List<String[]> history = new ArrayList<>();
+
+        // Use the same date logic as above to keep them synced
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int month = now.getMonthValue();
+        int year = now.getYear();
+        java.sql.Date startDate, endDate;
+
+        if (month >= 3 && month <= 8) {
+            startDate = java.sql.Date.valueOf(year + "-03-01");
+            endDate = java.sql.Date.valueOf(year + "-08-31");
+        } else {
+            if (month >= 9) {
+                startDate = java.sql.Date.valueOf(year + "-09-01");
+                endDate = java.sql.Date.valueOf((year + 1) + "-02-28");
+            } else {
+                startDate = java.sql.Date.valueOf((year - 1) + "-09-01");
+                endDate = java.sql.Date.valueOf(year + "-02-28");
+            }
+        }
+
+        String sql = "SELECT e.EventTitle, e.MeritPoints FROM REGISTRATION r " +
+                     "JOIN EVENT e ON r.EventID = e.EventID " +
+                     "WHERE r.USERID = ? AND LOWER(r.STATUS) = 'attended' " +
+                     "AND e.EventDate BETWEEN ? AND ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, userID);
+            ps.setDate(2, startDate);
+            ps.setDate(3, endDate);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                history.add(new String[]{rs.getString("EventTitle"), rs.getString("MeritPoints")});
+            }
         } catch (Exception e) { e.printStackTrace(); }
         return history;
     }
@@ -262,5 +293,49 @@ public int getUserTotalMerit(String userID) {
             }
         } catch (Exception e) { e.printStackTrace(); }
         return list;
+    }
+    
+    public Map<String, Integer> getPastSemestersSummary(String userID) {
+        Map<String, Integer> archive = new LinkedHashMap<>();
+
+        // 1. Identify what the "Current" semester label is based on today's date
+        String currentSemLabel = getSemesterLabel(java.sql.Date.valueOf(java.time.LocalDate.now()));
+
+        String sql = "SELECT e.EventDate, e.MeritPoints FROM REGISTRATION r " +
+                     "JOIN EVENT e ON r.EventID = e.EventID " +
+                     "WHERE r.UserID = ? AND LOWER(r.Status) = 'attended' " +
+                     "ORDER BY e.EventDate DESC";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, userID);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                java.sql.Date d = rs.getDate("EventDate");
+                int points = rs.getInt("MeritPoints");
+                String semLabel = getSemesterLabel(d);
+
+                // 2. ONLY add to archive if it's NOT the current semester
+                if (!semLabel.equals(currentSemLabel)) {
+                    archive.put(semLabel, archive.getOrDefault(semLabel, 0) + points);
+                }
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return archive;
+    }
+    // Helper method to keep your code clean
+    private String getSemesterLabel(java.sql.Date date) {
+        java.time.LocalDate ld = date.toLocalDate();
+        int month = ld.getMonthValue();
+        int year = ld.getYear();
+
+        if (month >= 3 && month <= 8) {
+            return "Semester 2 (" + year + ")";
+        } else {
+            int year1 = (month >= 9) ? year : year - 1;
+            int year2 = (month >= 9) ? year + 1 : year;
+            return "Semester 1 (" + year1 + "/" + year2 + ")";
+        }
     }
 }

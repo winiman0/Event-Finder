@@ -11,6 +11,7 @@
     UserDAO uDao = new UserDAO();
     int totalMerit = uDao.getUserTotalMerit(user.getUserID());
     List<String[]> meritHistory = uDao.getMeritHistory(user.getUserID());
+    Map<String, Integer> archiveSummary = uDao.getPastSemestersSummary(user.getUserID());
 %>
 
 <%@ include file="header.jsp" %>
@@ -202,28 +203,37 @@
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body p-0">
+                    <div class="p-3 bg-light border-bottom">
+                        <h6 class="text-uppercase font-weight-bold small text-muted">Current Semester Activity</h6>
+                    </div>
                     <table class="table mb-0">
-                        <thead class="thead-light">
-                            <tr>
-                                <th>Event Name</th>
-                                <th class="text-right">Points</th>
-                            </tr>
-                        </thead>
                         <tbody>
                             <% if (meritHistory.isEmpty()) { %>
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">No merits earned yet. Join an event!</td>
-                                </tr>
+                                <tr><td class="text-center py-4">No points earned this semester yet.</td></tr>
                             <% } else { 
                                 for (String[] record : meritHistory) { %>
                                 <tr>
                                     <td><%= record[0] %></td>
-                                    <td class="text-right text-success">+<%= record[1] %></td>
+                                    <td class="text-right text-success font-weight-bold">+<%= record[1] %></td>
                                 </tr>
-                            <% } 
-                            } %>
+                            <% } } %>
                         </tbody>
                     </table>
+
+                    <div class="p-3 bg-light border-bottom border-top mt-2">
+                        <h6 class="text-uppercase font-weight-bold small text-muted">Past Semesters Archive</h6>
+                    </div>
+                    <div class="p-3">
+                        <% if (archiveSummary.isEmpty()) { %>
+                            <p class="small text-muted mb-0">No historical records found.</p>
+                        <% } else { 
+                            for (Map.Entry<String, Integer> entry : archiveSummary.entrySet()) { %>
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom-dashed">
+                                <span class="text-dark"><%= entry.getKey() %></span>
+                                <span class="badge badge-secondary"><%= entry.getValue() %> Total Points</span>
+                            </div>
+                        <% } } %>
+                    </div>
                 </div>
             </div>
         </div>
