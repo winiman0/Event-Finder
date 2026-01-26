@@ -14,7 +14,7 @@
     
     // Fetch from UserDAO instead of EventDAO
     List<String[]> allCampuses = userDAO.getAllCampusesForDropdown();
-    
+   
     request.setAttribute("activePage", "users");
     
     
@@ -82,6 +82,11 @@
         }
         .pagination-btn.active { background: #c2acac; color: white; border-color: #c2acac; }
         .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .button-group {
+            display: flex;
+            gap: 8px;
+            white-space: nowrap;
+          }
     </style>
 </head>
 <body>
@@ -164,40 +169,68 @@
                                     <th>Full Name</th>
                                     <th>Email & Contact</th>
                                     <th>Campus</th>
+                                    <th>Merit (Sem)</th> 
                                     <th class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="tableBody">
                                 <% if(userList != null && !userList.isEmpty()) { 
                                     for(User u : userList) { %>
-                                    <tr class="user-row" data-campus="<%= u.getCampusName() %>">
-                                        <td class="font-weight-bold">#<%= u.getUserID() %></td>
-                                        <td><strong><%= u.getFullName() %></strong><br><small class="text-muted"><%= u.getRole() %></small></td>
-                                        <td>
-                                            <div><%= u.getEmail() %></div>
-                                            <small class="text-muted"><%= (u.getPhoneNumber() != null) ? u.getPhoneNumber() : "No Phone" %></small>
-                                        </td>
-                                        <td>
-                                            <strong><%= u.getCampusName() %></strong><br>
-                                            <small class="text-info"><%= u.getCampusState() %></small>
-                                        </td>
-                                        <td class="text-center">
-                                           <button type="button" class="btn btn-sm btn-light" 
-                                                onclick="openEditModal('<%= u.getUserID() %>', 
-                                                                       '<%= u.getFullName() %>', 
-                                                                       '<%= u.getEmail() %>', 
-                                                                       '<%= u.getPhoneNumber() %>', 
-                                                                       '<%= u.getCampusID() %>',  <%-- Ensure this is the ID --%>
-                                                                       '<%= u.getRole() %>', 
-                                                                       '<%= u.getFaculty() %>')">
+                                <% 
+                                    int points = userDAO.getUserTotalMerit(u.getUserID());
+                                    List<String[]> history = userDAO.getMeritHistory(u.getUserID()); 
+                                    boolean isRowUserAdmin = "admin".equalsIgnoreCase(u.getRole());
+                                %>
+
+                                <tr class="user-row" data-campus="<%= u.getCampusName() %>">
+                                    <td class="font-weight-bold">#<%= u.getUserID() %></td>
+                                    <td>
+                                        <strong><%= u.getFullName() %></strong><br>
+                                        <small class="text-muted"><%= u.getRole() %></small>
+                                    </td>
+                                    <td>
+                                        <div><%= u.getEmail() %></div>
+                                        <small class="text-muted"><%= (u.getPhoneNumber() != null) ? u.getPhoneNumber() : "No Phone" %></small>
+                                    </td>
+                                    <td>
+                                        <strong><%= u.getCampusName() %></strong><br>
+                                        <small class="text-info"><%= u.getCampusState() %></small>
+                                    </td>
+
+                                    <td>
+                                        <% if (!isRowUserAdmin) { %>
+                                            <span class="badge badge-success" style="font-size: 14px;">
+                                                <%= points %> pts
+                                            </span>
+                                        <% } else { %>
+                                            <span class="text-muted small">N/A</span>
+                                        <% } %>
+                                    </td>
+
+                                    <td class="text-center">
+                                        <div class="button-group">
+                                            <button type="button" class="btn btn-sm btn-info" 
+                                                    onclick="showLocalHistory('<%= u.getFullName() %>', this)"
+                                                    data-history="<% 
+                                                        if(history == null || history.isEmpty()){ %>No past records found<% } 
+                                                        else { 
+                                                            for(String[] h : history){ %><%= h[0] %> (<%= h[1] %> pts), <% }
+                                                        } %>">
+                                                <i class="fa fa-history"></i>
+                                            </button>
+
+                                            <button type="button" class="btn btn-sm btn-light" 
+                                                    onclick="openEditModal('<%= u.getUserID() %>', '<%= u.getFullName() %>', '<%= u.getEmail() %>', '<%= u.getPhoneNumber() %>', '<%= u.getCampusID() %>', '<%= u.getRole() %>', '<%= u.getFaculty() %>')" title="Edit User">
                                                 <i class="fa fa-pencil"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-danger" 
-                                                onclick="openDeleteModal('<%= u.getUserID() %>', '<%= u.getFullName() %>')">
+
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    onclick="openDeleteModal('<%= u.getUserID() %>', '<%= u.getFullName() %>')" title="Delete User">
                                                 <i class="fa fa-trash"></i>
                                             </button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </td>
+                                </tr>
                                 <% } } %>
                             </tbody>
                         </table>
@@ -265,6 +298,23 @@
                         <button type="submit" class="btn btn-primary" style="background-color: #c2acac; border: none;">Save Changes</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+                            
+    <div class="modal fade" id="meritHistoryModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-md" role="document">
+            <div class="modal-content" style="border-radius: 15px;">
+                <div class="modal-header" style="background-color: #6c63ff; color: white; border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                    <h5 class="modal-title">Merit History: <span id="historyUserName"></span></h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="meritLoading" class="text-center d-none">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                    <div id="historyContent"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -473,6 +523,25 @@
             document.getElementById('deleteUserName').innerText = name;
             document.getElementById('hiddenDeleteId').value = id;
             $('#deleteUserModal').modal('show');
+        }
+        
+        function showLocalHistory(userName, btn) {
+            document.getElementById('historyUserName').innerText = userName;
+            const historyData = btn.getAttribute('data-history');
+            const content = document.getElementById('historyContent');
+
+            // Pecahkan data dan buat table simple
+            let html = '<ul class="list-group">';
+            const items = historyData.split(', ');
+            items.forEach(item => {
+                if(item.trim() !== "") {
+                    html += '<li class="list-group-item">' + item + '</li>';
+                }
+            });
+            html += '</ul>';
+
+            content.innerHTML = html;
+            $('#meritHistoryModal').modal('show');
         }
     </script>
 </body>
