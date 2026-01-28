@@ -285,7 +285,7 @@
     <% } else { %>
         <%-- 3. ACTIVE VIEW --%>
         
-        <%-- Restore Original Admin Control Panel Design --%>
+        <%-- Admin Control Panel Design --%>
         <% if (currentUser != null && "admin".equalsIgnoreCase(currentUser.getRole())) { %>
             <div class="admin-actions" style="background: rgba(186, 192, 123,0.7); border: 1px solid transparent; padding: 25px; border-radius: 15px; color: #fff;">
                 <h5 style="color: #444722; letter-spacing: 1px; margin-bottom: 20px;">Admin Control Panel</h5><hr>
@@ -316,7 +316,7 @@
                 </a>
             </div>
 
-        <%-- Restore Student Actions --%>
+        <%-- Student Actions --%>
         <% } else if (currentUser != null) { %>
             <div class="main-dark-button" style="margin-top: 30px;">
                 <% if (alreadyRegistered) { %>
@@ -350,7 +350,7 @@
                 <% } %>
             </div>
 
-        <%-- Restore Guest Notice --%>
+        <%--  Guest Notice --%>
         <% } else { %>
              <div class="guest-notice" style="background: #fff3cd; padding: 20px; border-radius: 10px; border: 1px solid #ffeeba; margin-top: 30px;">
                 <p style="color: #856404; font-weight: 500;"><i class="fa fa-lock"></i> Want to join this event?</p>

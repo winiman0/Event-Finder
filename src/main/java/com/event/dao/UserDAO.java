@@ -5,6 +5,7 @@ import com.event.util.DBConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -245,15 +246,31 @@ public class UserDAO {
         return history;
     }
     public boolean deleteUser(String userId) {
-        String sql = "DELETE FROM USERS WHERE UserID = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        
+        String sql1 = "DELETE FROM REGISTRATION WHERE UserID = ?";
+        String sql2 = "DELETE FROM USERS WHERE UserID = ?";
 
-            ps.setString(1, userId);
-            return ps.executeUpdate() > 0;
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false); 
 
+            try (PreparedStatement ps1 = conn.prepareStatement(sql1);
+                 PreparedStatement ps2 = conn.prepareStatement(sql2)) {
+
+                ps1.setString(1, userId);
+                ps1.executeUpdate(); 
+
+                ps2.setString(1, userId);
+                int rows = ps2.executeUpdate(); 
+
+                conn.commit();
+                return rows > 0;
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
+            }
         } catch (Exception e) {
-            System.err.println("Error deleting user: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }

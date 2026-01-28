@@ -31,7 +31,7 @@ public class EventServlet extends HttpServlet {
 
             // Redirect back to details page
             response.sendRedirect("event-details.jsp?id=" + eventId + "&msg=" + (success ? "statusUpdated" : "error"));
-            return; // Stop execution here so it doesn't try to run the code below
+            return; 
         }
         // 1. Map Form to Model
         Event event = new Event();
@@ -111,23 +111,27 @@ public class EventServlet extends HttpServlet {
 
         String action = request.getParameter("action");
         String idStr = request.getParameter("id");
+        if (idStr == null) idStr = request.getParameter("eventId");
 
         if ("delete".equals(action) && idStr != null) {
             int eventId = Integer.parseInt(idStr);
             EventDAO dao = new EventDAO();
             Event e = dao.getEventById(eventId);
-            
-            if (e != null && e.getImageURL() != null && !e.getImageURL().equals("empty_image.png")) {
-         
-                String realPath = getServletContext().getRealPath("/");
-                File projectRoot = new File(realPath).getParentFile().getParentFile();
-                File file = new File(projectRoot, "external_uploads" + File.separator + e.getImageURL());
-                
-                if(file.exists()) file.delete();
-            }
+                if (e != null && e.getImageURL() != null && !e.getImageURL().equals("empty_image.png")) {
+                    String realPath = getServletContext().getRealPath("/");
+                    File projectRoot = new File(realPath).getParentFile().getParentFile();
+                    File file = new File(projectRoot, "external_uploads" + File.separator + e.getImageURL());
+                    if(file.exists()) file.delete();
+                }
 
-            boolean success = dao.deleteEvent(eventId);
-            response.sendRedirect("ad_event.jsp?status=" + (success ? "deleted" : "error"));
-        }
+                // 2. Delete from Database
+                boolean success = dao.deleteEvent(eventId);
+
+                // 3. Redirect to refresh the list
+                response.sendRedirect("ad_event.jsp?status=" + (success ? "deleted" : "error"));
+            } else {
+                
+                response.sendRedirect("ad_event.jsp");
+            }
     }
 } 

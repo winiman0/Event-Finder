@@ -19,14 +19,14 @@
     List<Event> allWaitingRaw = regDao.getWaitingListByUser(user.getUserID()); 
     
     // 2. Initialize our clean lists
-    List<Event> upcomingEvents = new ArrayList<>(); // Will hold ONLY Confirmed Future events
-    List<Event> waitingEvents = new ArrayList<>();  // Will hold ONLY Future Waitlisted events
-    List<Event> pastEvents = new ArrayList<>(pastEventsRaw); // Start with confirmed past events
+    List<Event> upcomingEvents = new ArrayList<>(); 
+    List<Event> waitingEvents = new ArrayList<>();  
+    List<Event> pastEvents = new ArrayList<>(pastEventsRaw); 
+    List<Event> pastWaitlist = new ArrayList<>();
     
     java.time.LocalDate today = java.time.LocalDate.now();
     
     // 3. Filter the 'Upcoming' list to only include Confirmed ones
-    // This prevents "Waiting" events from showing up in the "Confirmed" section
     for(Event e : rawUpcoming) {
         String status = e.getStatus();
         // Allow both Confirmed AND Cancelled to pass through to the calendar
@@ -39,22 +39,24 @@
     for(Event e : allWaitingRaw) {
         java.time.LocalDate eventDate = e.getEventDate().toLocalDate(); 
         if(eventDate.isBefore(today)) { 
-            pastEvents.add(e); 
+            pastWaitlist.add(e);; 
         } else { 
             waitingEvents.add(e); 
         }
     }
 
-    // 5. Update Counters
+   // 5. Update Counters
     int upcomingCount = upcomingEvents.size();
     int waitingCount = waitingEvents.size();
-    int totalJoined = upcomingCount + pastEvents.size();
 
-    // 6. Combine for Calendar (No duplicates now!)
+    int totalJoined = pastEventsRaw.size() + pastWaitlist.size();
+
+    // 6. Combine for Calendar 
     List<Event> allMyEvents = new ArrayList<>();
     allMyEvents.addAll(upcomingEvents);
-    allMyEvents.addAll(pastEvents);
-    allMyEvents.addAll(waitingEvents);
+    allMyEvents.addAll(pastEventsRaw); // Confirmed 
+    allMyEvents.addAll(waitingEvents);  // Future 
+    allMyEvents.addAll(pastWaitlist);   // Past 
 
     request.setAttribute("activePage", "myevents");
 %>
@@ -226,24 +228,32 @@
                         </div>
 
                         <div class="list-section" id="history-section" style="display:none;">
-                            <% if(pastEvents.isEmpty()) { %>
-                                <div class="empty-state">No past event history.</div>
-                            <% } else { for(Event e : pastEvents) { 
-                                boolean wasVerified = "Attended".equalsIgnoreCase(e.getStatus());
-                            %>
-                                <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card">
-                                    <h5><%= e.getEventTitle() %></h5>
-                                    <p>
-                                        <% if(wasVerified) { %>
-                                            <span class="badge badge-success">Points Earned: +<%= e.getMeritPoints() %></span>
-                                        <% } else { %>
-                                            <span class="badge badge-secondary">Attendance Not Verified</span>
-                                        <% } %>
-                                        | <%= e.getEventDate() %>
-                                    </p>
-                                </a>
-                            <% } } %>
-                        </div>
+                        <% 
+                            
+                            List<Event> historyList = new ArrayList<>(pastEventsRaw);
+                            historyList.addAll(pastWaitlist);
+
+                            if(historyList.isEmpty()) { %>
+                            <div class="empty-state">No past event history.</div>
+                        <% } else { for(Event e : historyList) { 
+                            boolean wasConfirmed = pastEventsRaw.contains(e);
+                            boolean wasVerified = "Attended".equalsIgnoreCase(e.getStatus());
+                        %>
+                            <a href="event-details.jsp?id=<%= e.getEventID() %>" class="event-mini-card" style="<%= !wasConfirmed ? "opacity: 0.7;" : "" %>">
+                                <h5><%= e.getEventTitle() %></h5>
+                                <p>
+                                    <% if(wasVerified) { %>
+                                        <span class="badge badge-success">Points Earned: +<%= e.getMeritPoints() %></span>
+                                    <% } else if (wasConfirmed) { %>
+                                        <span class="badge badge-secondary">Absent / Not Verified</span>
+                                    <% } else { %>
+                                        <span class="badge badge-dark">Waitlist Expired</span>
+                                    <% } %>
+                                    | <%= e.getEventDate() %>
+                                </p>
+                            </a>
+                        <% } } %>
+                    </div>
 
                     </div>
                 </div>

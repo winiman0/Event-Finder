@@ -189,29 +189,47 @@ public class EventDAO {
 
     // 5. Update an existing event
     public boolean updateEvent(Event event) {
-        String sql = "UPDATE EVENT SET OrganizerID=?, CampusID=?, EventTitle=?, Description=?, EventType=?, " +
-                     "EventVenue=?, EventDate=?, StartTime=?, EndTime=?, Status=?, ImageURL=?, " +
-                     "MeritPoints=?, MaxCapacity=? WHERE EventID=?";
+        String updateEventSql = "UPDATE EVENT SET OrganizerID=?, CampusID=?, EventTitle=?, Description=?, EventType=?, " +
+                                "EventVenue=?, EventDate=?, StartTime=?, EndTime=?, Status=?, ImageURL=?, " +
+                                "MeritPoints=?, MaxCapacity=? WHERE EventID=?";
 
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        String resetAttendanceSql = "UPDATE REGISTRATION SET Status = 'Registered' WHERE EventID = ? AND Status = 'Attended'";
 
-            ps.setInt(1, event.getOrganizerID());
-            ps.setString(2, event.getCampusID());
-            ps.setString(3, event.getEventTitle());
-            ps.setString(4, event.getDescription());
-            ps.setString(5, event.getEventType());
-            ps.setString(6, event.getEventVenue());
-            ps.setDate(7, event.getEventDate());
-            ps.setTime(8, event.getStartTime());
-            ps.setTime(9, event.getEndTime());
-            ps.setString(10, event.getStatus());
-            ps.setString(11, event.getImageURL());
-            ps.setInt(12, event.getMeritPoints());
-            ps.setInt(13, event.getMaxCapacity());
-            ps.setInt(14, event.getEventID());
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false); 
+            try (PreparedStatement psEvent = conn.prepareStatement(updateEventSql);
+                 PreparedStatement psReset = conn.prepareStatement(resetAttendanceSql)) {
 
-            return ps.executeUpdate() > 0;
+                // 1. Update the Event details
+                psEvent.setInt(1, event.getOrganizerID());
+                psEvent.setString(2, event.getCampusID());
+                psEvent.setString(3, event.getEventTitle());
+                psEvent.setString(4, event.getDescription());
+                psEvent.setString(5, event.getEventType());
+                psEvent.setString(6, event.getEventVenue());
+                psEvent.setDate(7, event.getEventDate());
+                psEvent.setTime(8, event.getStartTime());
+                psEvent.setTime(9, event.getEndTime());
+                psEvent.setString(10, event.getStatus());
+                psEvent.setString(11, event.getImageURL());
+                psEvent.setInt(12, event.getMeritPoints());
+                psEvent.setInt(13, event.getMaxCapacity());
+                psEvent.setInt(14, event.getEventID());
+                psEvent.executeUpdate();
+
+                // 2. Logic: If moving back to 'Upcoming', reset attendance
+                if ("Upcoming".equalsIgnoreCase(event.getStatus())) {
+                    psReset.setInt(1, event.getEventID());
+                    psReset.executeUpdate();
+                }
+
+                conn.commit(); 
+                return true;
+            } catch (SQLException e) {
+                conn.rollback(); 
+                e.printStackTrace();
+                return false;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -236,12 +254,29 @@ public class EventDAO {
         return organizers;
     }
     
-    public boolean deleteEvent(int id) {
-        String sql = "DELETE FROM EVENT WHERE EventID = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
+    public boolean deleteEvent(int eventId) {
+        String deleteRegistrations = "DELETE FROM REGISTRATION WHERE EventID = ?"; 
+        String deleteEvent = "DELETE FROM EVENT WHERE EventID = ?";
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false); 
+            try (PreparedStatement ps1 = conn.prepareStatement(deleteRegistrations);
+                 PreparedStatement ps2 = conn.prepareStatement(deleteEvent)) {
+
+                // Step 1: Delete participants first
+                ps1.setInt(1, eventId);
+                ps1.executeUpdate();
+
+                // Step 2: delete the event
+                ps2.setInt(1, eventId);
+                int rows = ps2.executeUpdate();
+
+                conn.commit(); 
+                return rows > 0;
+            } catch (SQLException e) {
+                conn.rollback(); 
+                e.printStackTrace();
+                return false;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -288,15 +323,30 @@ public class EventDAO {
     
    
     public boolean updateEventStatus(int eventId, String status) {
-        
-        String sql = "UPDATE EVENT SET Status = ? WHERE EventID = ?"; 
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        String updateSql = "UPDATE EVENT SET Status = ? WHERE EventID = ?";
+        String resetSql = "UPDATE REGISTRATION SET Status = 'Registered' WHERE EventID = ? AND Status = 'Attended'";
 
-            ps.setString(1, status);
-            ps.setInt(2, eventId);
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps1 = conn.prepareStatement(updateSql);
+                 PreparedStatement ps2 = conn.prepareStatement(resetSql)) {
 
-            return ps.executeUpdate() > 0;
+                ps1.setString(1, status);
+                ps1.setInt(2, eventId);
+                ps1.executeUpdate();
+
+                if ("Upcoming".equalsIgnoreCase(status)) {
+                    ps2.setInt(1, eventId);
+                    ps2.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
